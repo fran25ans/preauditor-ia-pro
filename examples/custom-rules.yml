@@ -1,0 +1,38 @@
+rules:
+  - id: ACME-001
+    title: Uso de dominio interno prohibido
+    severity: Alta
+    category: Custom
+    cvss: 7.4
+    confidence: Media
+    remediation_effort: Baja
+    regex: internal-admin.example.com
+    file_globs:
+      - "*.js"
+      - "*.ts"
+      - "*.env*"
+    description: Se ha detectado una referencia a un dominio interno no permitido por politica.
+    why_dangerous: Puede exponer superficies internas o acoplar codigo cliente a infraestructura privada.
+    exploit_concept: Un atacante podria usar la referencia para enumerar servicios internos o forzar llamadas no previstas.
+    recommendation: Sustituir por una variable de entorno aprobada y revisar exposicion del servicio.
+    secure_example: API_BASE_URL=https://api.example.com
+    reference: Politica interna ACME / OWASP API7 Security Misconfiguration
+
+  - id: ACME-002
+    title: Flag de bypass interno activado
+    severity: Critica
+    category: Custom
+    regexes:
+      - bypassAuth\s*[:=]\s*true
+      - DISABLE_AUTH\s*=\s*true
+    file_globs:
+      - "*.js"
+      - "*.ts"
+      - "*.py"
+      - "*.env*"
+    description: Se ha detectado un flag que podria desactivar autenticacion.
+    why_dangerous: Un bypass de autenticacion puede dejar recursos sensibles accesibles sin control.
+    exploit_concept: Si llega a produccion, un atacante podria invocar endpoints sin credenciales validas.
+    recommendation: Eliminar el flag o limitarlo a tests aislados con controles de entorno.
+    secure_example: REQUIRE_AUTH=true
+    reference: OWASP API2 Broken Authentication

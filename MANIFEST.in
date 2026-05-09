@@ -1,0 +1,4 @@
+include README.md
+include .preauditor-ignore.example
+recursive-include examples *.yml
+recursive-include tests *.py

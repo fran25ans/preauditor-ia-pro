@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "preauditor-ia"
+version = "0.1.0"
+description = "Pre-auditor local de seguridad para APIs, CI/CD, cloud e integraciones de IA."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Pre-Auditor IA Pro" }
+]
+keywords = ["security", "audit", "llm", "ci-cd", "appsec", "preauditor"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+  "reportlab>=3.6",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[project.scripts]
+preauditor = "preauditor:main"
+preauditor-ui = "preauditor_ui:main"
+
+[tool.setuptools]
+py-modules = ["preauditor", "preauditor_ui"]
