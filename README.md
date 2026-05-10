@@ -59,6 +59,10 @@ Si quieres que intente abrir el navegador automaticamente:
 preauditor-ui --open
 ```
 
+### Ejecución en terminal / interfaz local
+
+![Ejecución local de Pre-Auditor IA Pro](docs/assets/terminalweb.png)
+
 ## Que detecta
 
 El perfil `pro` incluye 100 reglas activas repartidas por API, IA, CI/CD, supply chain, secretos, contenedores, Kubernetes, cloud/Terraform, infraestructura, autenticacion, sesiones, frontend, privacidad, resiliencia, criptografia e inyecciones.
@@ -181,6 +185,14 @@ python3 preauditor.py ./mi-app \
 ```
 
 El dashboard es un HTML local con busqueda, filtro por severidad y filtro por categoria. El PDF se genera automaticamente con `reportlab` cuando esta disponible en el Python que ejecuta la herramienta.
+
+### Dashboard local
+
+![Dashboard local de Pre-Auditor IA Pro](docs/assets/dashboard.png)
+
+### Informe PDF
+
+![Informe PDF de Pre-Auditor IA Pro](docs/assets/informePDF.png)
 
 ## Pack de entrega
 
