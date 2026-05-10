@@ -39,10 +39,23 @@ def page_shell(content: str) -> bytes:
     .panel {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:18px; }}
     label {{ display:block; font-size:13px; font-weight:700; margin:12px 0 5px; }}
     input, select, button {{ width:100%; border:1px solid var(--line); border-radius:6px; padding:10px; font-size:14px; background:#fff; color:var(--ink); }}
+    .path-picker {{ display:grid; grid-template-columns:1fr 104px; gap:8px; }}
     .check {{ display:flex; gap:8px; align-items:center; font-size:13px; font-weight:700; margin:12px 0 5px; }}
     .check input {{ width:auto; }}
     button {{ background:var(--brand); color:#fff; border-color:var(--brand); font-weight:700; cursor:pointer; margin-top:16px; }}
+    .path-picker button {{ margin-top:0; }}
     button:disabled {{ opacity:.55; cursor:wait; }}
+    .modal {{ position:fixed; inset:0; display:none; place-items:center; background:rgba(15,23,42,.42); padding:20px; z-index:20; }}
+    .modal.open {{ display:grid; }}
+    .modal-card {{ width:min(760px,100%); max-height:82vh; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 60px rgba(15,23,42,.24); }}
+    .modal-head {{ display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:14px; border-bottom:1px solid var(--line); }}
+    .modal-body {{ padding:14px; }}
+    .browser-path {{ margin-bottom:10px; }}
+    .browser-list {{ border:1px solid var(--line); border-radius:8px; max-height:390px; overflow:auto; }}
+    .browser-row {{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); }}
+    .browser-row:last-child {{ border-bottom:0; }}
+    .browser-row button {{ width:auto; margin:0; padding:7px 10px; }}
+    .secondary {{ background:#fff; color:var(--brand); }}
     .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
     .kpi {{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }}
     .kpi span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
@@ -78,9 +91,15 @@ def render_home() -> bytes:
     <h2>Nuevo escaneo</h2>
     <form id="scan-form">
       <label>Ruta del proyecto</label>
-      <input name="target" value="{html.escape(str(APP_ROOT))}" required>
+      <div class="path-picker">
+        <input name="target" value="{html.escape(str(APP_ROOT))}" required>
+        <button type="button" class="browse-button" data-target="target">Explorar</button>
+      </div>
       <label>Carpeta de salida</label>
-      <input name="output_dir" value="{html.escape(str(APP_ROOT / 'deliverables' / 'ui-scan'))}" required>
+      <div class="path-picker">
+        <input name="output_dir" value="{html.escape(str(APP_ROOT / 'deliverables' / 'ui-scan'))}" required>
+        <button type="button" class="browse-button" data-target="output_dir">Explorar</button>
+      </div>
       <label>Perfil</label>
       <select name="profile">{profiles}</select>
       <label>Stack</label>
@@ -120,10 +139,83 @@ def render_home() -> bytes:
     </div>
   </section>
 </div>
+<div id="folder-modal" class="modal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <strong>Seleccionar carpeta</strong>
+      <button type="button" id="folder-close" class="secondary">Cerrar</button>
+    </div>
+    <div class="modal-body">
+      <div class="path-picker browser-path">
+        <input id="folder-current" value="{html.escape(str(Path.home()))}">
+        <button type="button" id="folder-go">Ir</button>
+      </div>
+      <div class="path-picker browser-path">
+        <button type="button" id="folder-parent" class="secondary">Subir nivel</button>
+        <button type="button" id="folder-select">Usar esta carpeta</button>
+      </div>
+      <div id="folder-list" class="browser-list"></div>
+    </div>
+  </div>
+</div>
 <script>
 const form = document.getElementById('scan-form');
 const button = document.getElementById('scan-button');
 const result = document.getElementById('result');
+const folderModal = document.getElementById('folder-modal');
+const folderCurrent = document.getElementById('folder-current');
+const folderList = document.getElementById('folder-list');
+let activePathInput = null;
+function escapeHtml(value) {{
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
+}}
+async function loadFolder(path) {{
+  folderList.innerHTML = '<div class="browser-row"><span>Cargando...</span></div>';
+  const response = await fetch(`/browse?path=${{encodeURIComponent(path || '')}}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'No se pudo leer la carpeta');
+  folderCurrent.value = data.path;
+  folderList.innerHTML = data.directories.map(item => `
+    <div class="browser-row">
+      <span>${{escapeHtml(item.name)}}</span>
+      <button type="button" data-path="${{escapeHtml(item.path)}}">Abrir</button>
+    </div>
+  `).join('') || '<div class="browser-row"><span>Sin subcarpetas visibles.</span></div>';
+}}
+document.querySelectorAll('.browse-button').forEach(browse => {{
+  browse.addEventListener('click', async () => {{
+    activePathInput = form.elements[browse.dataset.target];
+    folderModal.classList.add('open');
+    try {{
+      await loadFolder(activePathInput.value);
+    }} catch (error) {{
+      folderList.innerHTML = `<div class="browser-row"><span class="error">${{escapeHtml(error.message)}}</span></div>`;
+    }}
+  }});
+}});
+folderList.addEventListener('click', async event => {{
+  const openButton = event.target.closest('button[data-path]');
+  if (!openButton) return;
+  try {{
+    await loadFolder(openButton.dataset.path);
+  }} catch (error) {{
+    folderList.innerHTML = `<div class="browser-row"><span class="error">${{escapeHtml(error.message)}}</span></div>`;
+  }}
+}});
+document.getElementById('folder-go').addEventListener('click', async () => loadFolder(folderCurrent.value));
+document.getElementById('folder-parent').addEventListener('click', async () => {{
+  const parts = folderCurrent.value.replace(/\/+$/, '').split('/');
+  const parent = parts.length > 1 ? parts.slice(0, -1).join('/') || '/' : '/';
+  await loadFolder(parent);
+}});
+document.getElementById('folder-select').addEventListener('click', () => {{
+  if (activePathInput) activePathInput.value = folderCurrent.value;
+  folderModal.classList.remove('open');
+}});
+document.getElementById('folder-close').addEventListener('click', () => folderModal.classList.remove('open'));
+folderModal.addEventListener('click', event => {{
+  if (event.target === folderModal) folderModal.classList.remove('open');
+}});
 form.addEventListener('submit', async (event) => {{
   event.preventDefault();
   button.disabled = true;
@@ -176,6 +268,41 @@ def safe_artifact(path_value: str) -> Path | None:
     if any(path == root or root in path.parents for root in allowed_roots):
         return path if path.exists() and path.is_file() else None
     return None
+
+
+def browse_folder(path_value: str) -> dict:
+    candidate = Path(unquote(path_value or str(Path.home()))).expanduser()
+    if not candidate.is_absolute():
+        candidate = (APP_ROOT / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+
+    while not candidate.exists() and candidate != candidate.parent:
+        candidate = candidate.parent
+    if not candidate.exists() or not candidate.is_dir():
+        candidate = Path.home().resolve()
+
+    directories = []
+    try:
+        for child in candidate.iterdir():
+            if child.name.startswith("."):
+                continue
+            if child.is_dir():
+                directories.append(
+                    {
+                        "name": child.name,
+                        "path": str(child.resolve()),
+                    }
+                )
+    except OSError as exc:
+        raise ValueError(f"No se puede leer la carpeta: {exc}") from exc
+
+    directories.sort(key=lambda item: item["name"].lower())
+    return {
+        "path": str(candidate),
+        "parent": str(candidate.parent),
+        "directories": directories,
+    }
 
 
 def scan_project(payload: dict) -> dict:
@@ -302,6 +429,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", content_type)
             self.end_headers()
             self.wfile.write(artifact.read_bytes())
+            return
+        if parsed.path == "/browse":
+            params = parse_qs(parsed.query)
+            try:
+                body = json.dumps(
+                    browse_folder(params.get("path", [""])[0]),
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                self.send_response(200)
+            except Exception as exc:
+                body = json.dumps({"error": str(exc)}, ensure_ascii=False).encode("utf-8")
+                self.send_response(400)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(body)
             return
         self.send_error(404)
 
