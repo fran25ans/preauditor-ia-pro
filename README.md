@@ -6,19 +6,12 @@ Herramienta local para hacer una primera lectura profesional de riesgos en proye
 
 ## Instalacion como comando
 
-Tienes varias formas de instalarlo como comandos locales `preauditor` y `preauditor-ui`.
+Pre-Auditor IA Pro instala dos comandos locales:
 
-### Desde el tag de GitHub
+- `preauditor`
+- `preauditor-ui`
 
-Instala directamente una version concreta del repositorio:
-
-```bash
-python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v0.1.0"
-```
-
-Esta opcion es comoda si quieres instalar la version etiquetada sin descargar archivos manualmente.
-
-### Desde la release de GitHub
+### Instalacion rapida recomendada
 
 Instala el wheel publicado en la release `v0.1.0`:
 
@@ -26,10 +19,34 @@ Instala el wheel publicado en la release `v0.1.0`:
 python3 -m pip install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
 ```
 
+Comprueba la instalacion:
+
+```bash
+preauditor --profile pro --list-rules
+preauditor-ui
+```
+
 Pagina de la release:
 
 ```text
 https://github.com/fran25ans/preauditor-ia-pro/releases/tag/v0.1.0
+```
+
+### Instalacion aislada con pipx
+
+Recomendado si quieres usarlo como herramienta de linea de comandos sin mezclar dependencias con otros proyectos:
+
+```bash
+python3 -m pip install pipx
+python3 -m pipx install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
+```
+
+### Desde el tag de GitHub
+
+Instala directamente una version concreta del repositorio:
+
+```bash
+python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v0.1.0"
 ```
 
 ### Desde un wheel local
@@ -60,16 +77,12 @@ Tambien puedes usar el instalador local del repositorio:
 sh install.sh
 ```
 
+### Reinstalar la version publicada
+
 Si ya tenias una version previa instalada y quieres reinstalar:
 
 ```bash
 python3 -m pip install --force-reinstall "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
-```
-
-Comprueba la instalacion:
-
-```bash
-preauditor --profile pro --list-rules
 ```
 
 ## Interfaz web local
