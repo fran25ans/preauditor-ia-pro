@@ -6,22 +6,64 @@ Herramienta local para hacer una primera lectura profesional de riesgos en proye
 
 ## Instalacion como comando
 
-Para instalarlo como comando local `preauditor`:
+Tienes varias formas de instalarlo como comandos locales `preauditor` y `preauditor-ui`.
+
+### Desde el tag de GitHub
+
+Instala directamente una version concreta del repositorio:
 
 ```bash
-python3 -m pip install -e . --no-build-isolation
+python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v0.1.0"
 ```
 
-O instala el wheel generado en `dist/`:
+Esta opcion es comoda si quieres instalar la version etiquetada sin descargar archivos manualmente.
+
+### Desde la release de GitHub
+
+Instala el wheel publicado en la release `v0.1.0`:
+
+```bash
+python3 -m pip install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
+```
+
+Pagina de la release:
+
+```text
+https://github.com/fran25ans/preauditor-ia-pro/releases/tag/v0.1.0
+```
+
+### Desde un wheel local
+
+Si ya tienes el archivo `.whl` descargado:
+
+```bash
+python3 -m pip install preauditor_ia-0.1.0-py3-none-any.whl
+```
+
+O, si estas dentro del proyecto y tienes el wheel generado en `dist/`:
 
 ```bash
 python3 -m pip install dist/preauditor_ia-0.1.0-py3-none-any.whl
 ```
 
-Tambien puedes usar el instalador local:
+### Desde el codigo fuente
+
+Para desarrollo local, instala en modo editable:
+
+```bash
+python3 -m pip install -e . --no-build-isolation
+```
+
+Tambien puedes usar el instalador local del repositorio:
 
 ```bash
 sh install.sh
+```
+
+Si ya tenias una version previa instalada y quieres reinstalar:
+
+```bash
+python3 -m pip install --force-reinstall "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
 ```
 
 Comprueba la instalacion:
