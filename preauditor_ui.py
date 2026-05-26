@@ -27,22 +27,30 @@ def page_shell(content: str) -> bytes:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pre-Auditor IA Pro</title>
   <style>
-    :root {{ --ink:#172033; --muted:#667085; --line:#d8dee8; --panel:#f7f9fc; --brand:#0f766e; --critical:#a31925; --high:#c2410c; --medium:#9a6700; --low:#176f4d; }}
+    :root {{ --ink:#172033; --muted:#667085; --line:#d8dee8; --panel:#f7f9fc; --brand:#0f766e; --brand-dark:#115e59; --critical:#a31925; --high:#c2410c; --medium:#9a6700; --low:#176f4d; }}
     * {{ box-sizing:border-box; }}
-    body {{ margin:0; font-family:Arial, sans-serif; color:var(--ink); background:#f4f7fb; }}
+    body {{ margin:0; font-family:Arial, sans-serif; color:var(--ink); background:#eef3f8; }}
     header {{ background:#fff; border-bottom:1px solid var(--line); padding:22px 28px; }}
-    main {{ max-width:1180px; margin:0 auto; padding:24px; }}
-    h1 {{ margin:0 0 6px; font-size:28px; }}
-    h2 {{ margin:0 0 14px; font-size:20px; }}
+    main {{ max-width:1240px; margin:0 auto; padding:24px; }}
+    h1 {{ margin:0 0 6px; font-size:30px; }}
+    h2 {{ margin:0 0 14px; font-size:19px; }}
+    h3 {{ margin:18px 0 10px; font-size:13px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }}
     p {{ margin:0 0 10px; color:var(--muted); }}
-    .grid {{ display:grid; grid-template-columns:380px 1fr; gap:18px; align-items:start; }}
-    .panel {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:18px; }}
+    .topbar {{ max-width:1240px; margin:0 auto; display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }}
+    .status {{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }}
+    .pill {{ border:1px solid var(--line); border-radius:999px; padding:6px 10px; background:#f8fafc; font-size:12px; font-weight:700; color:var(--brand-dark); }}
+    .grid {{ display:grid; grid-template-columns:430px 1fr; gap:18px; align-items:start; }}
+    .panel {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,.05); }}
+    .section {{ border-top:1px solid var(--line); padding-top:14px; margin-top:14px; }}
+    .section:first-child {{ border-top:0; padding-top:0; margin-top:0; }}
     label {{ display:block; font-size:13px; font-weight:700; margin:12px 0 5px; }}
     input, select, button {{ width:100%; border:1px solid var(--line); border-radius:6px; padding:10px; font-size:14px; background:#fff; color:var(--ink); }}
     .path-picker {{ display:grid; grid-template-columns:1fr 104px; gap:8px; }}
     .check {{ display:flex; gap:8px; align-items:center; font-size:13px; font-weight:700; margin:12px 0 5px; }}
     .check input {{ width:auto; }}
     button {{ background:var(--brand); color:#fff; border-color:var(--brand); font-weight:700; cursor:pointer; margin-top:16px; }}
+    button:hover {{ background:var(--brand-dark); border-color:var(--brand-dark); }}
+    .primary {{ font-size:15px; padding:13px; }}
     .path-picker button {{ margin-top:0; }}
     button:disabled {{ opacity:.55; cursor:wait; }}
     .modal {{ position:fixed; inset:0; display:none; place-items:center; background:rgba(15,23,42,.42); padding:20px; z-index:20; }}
@@ -56,6 +64,9 @@ def page_shell(content: str) -> bytes:
     .browser-row:last-child {{ border-bottom:0; }}
     .browser-row button {{ width:auto; margin:0; padding:7px 10px; }}
     .secondary {{ background:#fff; color:var(--brand); }}
+    .secondary:hover {{ background:#eefaf7; color:var(--brand-dark); }}
+    .quick-actions {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }}
+    .note {{ border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:8px; padding:12px; font-size:13px; }}
     .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
     .kpi {{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }}
     .kpi span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
@@ -67,14 +78,25 @@ def page_shell(content: str) -> bytes:
     a {{ color:var(--brand); font-weight:700; text-decoration:none; }}
     .links {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0 18px; }}
     .links a {{ border:1px solid var(--line); border-radius:6px; padding:10px; background:#fff; }}
+    .empty {{ border:1px dashed var(--line); border-radius:8px; padding:18px; background:#f8fafc; }}
+    .empty ul {{ margin:10px 0 0; padding-left:18px; color:var(--muted); }}
     .error {{ color:#a31925; font-weight:700; }}
-    @media (max-width:900px) {{ .grid,.kpis,.links {{ grid-template-columns:1fr; }} }}
+    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
 <body>
   <header>
-    <h1>Pre-Auditor IA Pro</h1>
-    <p>Interfaz local para lanzar escaneos, generar packs de entrega y revisar hallazgos sin terminal.</p>
+    <div class="topbar">
+      <div>
+        <h1>Pre-Auditor IA Pro</h1>
+        <p>Primer analista local de seguridad: detecta riesgos, prioriza hallazgos y genera un pack listo para revision experta.</p>
+      </div>
+      <div class="status">
+        <span class="pill">Local</span>
+        <span class="pill">Privado</span>
+        <span class="pill">Pro</span>
+      </div>
+    </div>
   </header>
   <main>{content}</main>
 </body>
@@ -85,57 +107,81 @@ def page_shell(content: str) -> bytes:
 def render_home() -> bytes:
     profiles = "".join(f"<option value='{p}'>{p}</option>" for p in sorted(preauditor.PROFILES))
     stacks = "".join(f"<option value='{s}'>{s}</option>" for s in sorted(preauditor.STACKS))
+    demo_target = APP_ROOT / "sample-vulnerable"
+    demo_output = APP_ROOT / "deliverables" / "demo-product"
     content = f"""
 <div class="grid">
   <section class="panel">
     <h2>Nuevo escaneo</h2>
+    <p class="note">Demo recomendada: usa una carpeta concreta de proyecto. Evita escanear carpetas grandes como el escritorio completo.</p>
+    <div class="quick-actions">
+      <button type="button" id="demo-preset" class="secondary">Demo rápida</button>
+      <button type="button" id="clear-advanced" class="secondary">Modo rápido</button>
+    </div>
     <form id="scan-form">
-      <label>Ruta del proyecto</label>
-      <div class="path-picker">
-        <input name="target" value="{html.escape(str(APP_ROOT))}" required>
-        <button type="button" class="browse-button" data-target="target">Explorar</button>
+      <div class="section">
+        <h3>Escaneo</h3>
+        <label>Ruta del proyecto</label>
+        <div class="path-picker">
+          <input name="target" value="{html.escape(str(demo_target if demo_target.exists() else APP_ROOT))}" required>
+          <button type="button" class="browse-button" data-target="target">Explorar</button>
+        </div>
+        <label>Perfil</label>
+        <select name="profile">{profiles}</select>
+        <label>Stack</label>
+        <select name="stack">{stacks}</select>
       </div>
-      <label>Carpeta de salida</label>
-      <div class="path-picker">
-        <input name="output_dir" value="{html.escape(str(APP_ROOT / 'deliverables' / 'ui-scan'))}" required>
-        <button type="button" class="browse-button" data-target="output_dir">Explorar</button>
+      <div class="section">
+        <h3>Informe</h3>
+        <label>Carpeta de salida</label>
+        <div class="path-picker">
+          <input name="output_dir" value="{html.escape(str(APP_ROOT / 'deliverables' / 'ui-scan'))}" required>
+          <button type="button" class="browse-button" data-target="output_dir">Explorar</button>
+        </div>
+        <label>Cliente</label>
+        <input name="client" value="Cliente demo">
+        <label>Auditor</label>
+        <input name="auditor" value="Francisco José Gimeno">
+        <label>Alcance</label>
+        <input name="scope" value="Pre-auditoria local de seguridad">
+        <label>Versión del informe</label>
+        <input name="report_version" value="{datetime.now().strftime('%Y.%m')}">
       </div>
-      <label>Perfil</label>
-      <select name="profile">{profiles}</select>
-      <label>Stack</label>
-      <select name="stack">{stacks}</select>
-      <label>Reglas custom YAML/JSON</label>
-      <input name="rules_file" placeholder="/ruta/a/preauditor-rules.yml">
-      <label>Cliente</label>
-      <input name="client" value="Cliente demo">
-      <label>Auditor</label>
-      <input name="auditor" value="Francisco José Gimeno">
-      <label>Alcance</label>
-      <input name="scope" value="Pre-auditoria local de seguridad">
-      <label>Versión del informe</label>
-      <input name="report_version" value="{datetime.now().strftime('%Y.%m')}">
-      <label class="check"><input type="checkbox" name="ollama" value="1"> Triage local con Ollama</label>
-      <label>Modelo Ollama</label>
-      <input name="ollama_model" value="llama3.1">
-      <label>URL Ollama</label>
-      <input name="ollama_url" value="http://127.0.0.1:11434">
-      <label>Limite Ollama</label>
-      <input name="ollama_limit" value="20">
-      <label>Severidad minima Ollama</label>
-      <select name="ollama_min_severity">
-        <option value="Alta">Alta</option>
-        <option value="Critica">Critica</option>
-        <option value="Media">Media</option>
-        <option value="Baja">Baja</option>
-      </select>
-      <label class="check"><input type="checkbox" name="ollama_filter_fp" value="1"> Ocultar probables falsos positivos</label>
-      <button id="scan-button" type="submit">Escanear y generar pack</button>
+      <div class="section">
+        <h3>Opciones avanzadas</h3>
+        <label>Reglas custom YAML/JSON</label>
+        <input name="rules_file" placeholder="/ruta/a/preauditor-rules.yml">
+        <label class="check"><input type="checkbox" name="ollama" value="1"> Triage local con Ollama</label>
+        <label>Modelo Ollama</label>
+        <input name="ollama_model" value="llama3.1">
+        <label>URL Ollama</label>
+        <input name="ollama_url" value="http://127.0.0.1:11434">
+        <label>Limite Ollama</label>
+        <input name="ollama_limit" value="20">
+        <label>Severidad minima Ollama</label>
+        <select name="ollama_min_severity">
+          <option value="Alta">Alta</option>
+          <option value="Critica">Critica</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+        <label class="check"><input type="checkbox" name="ollama_filter_fp" value="1"> Ocultar probables falsos positivos</label>
+      </div>
+      <button id="scan-button" class="primary" type="submit">Generar pre-auditoria profesional</button>
     </form>
   </section>
   <section class="panel">
-    <h2>Resultado</h2>
+    <h2>Panel de entrega</h2>
     <div id="result">
-      <p>Configura el escaneo y pulsa el botón. La herramienta generará Markdown, HTML, PDF, dashboard, JSON, SARIF, baseline y checklist.</p>
+      <div class="empty">
+        <p><strong>Listo para generar un pack profesional.</strong></p>
+        <p>El resultado incluirá resumen ejecutivo, informe tecnico, dashboard, JSON, SARIF, baseline y checklist de remediacion.</p>
+        <ul>
+          <li>La auditoria automatica no sustituye la revision experta.</li>
+          <li>Los hallazgos se entregan priorizados para validacion humana.</li>
+          <li>Usa la demo rapida para una presentacion controlada.</li>
+        </ul>
+      </div>
     </div>
   </section>
 </div>
@@ -166,6 +212,8 @@ const folderModal = document.getElementById('folder-modal');
 const folderCurrent = document.getElementById('folder-current');
 const folderList = document.getElementById('folder-list');
 let activePathInput = null;
+const demoTarget = {json.dumps(str(demo_target))};
+const demoOutput = {json.dumps(str(demo_output))};
 function escapeHtml(value) {{
   return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
 }}
@@ -204,7 +252,7 @@ folderList.addEventListener('click', async event => {{
 }});
 document.getElementById('folder-go').addEventListener('click', async () => loadFolder(folderCurrent.value));
 document.getElementById('folder-parent').addEventListener('click', async () => {{
-  const parts = folderCurrent.value.replace(/\/+$/, '').split('/');
+  const parts = folderCurrent.value.replace(/\\/+$/, '').split('/');
   const parent = parts.length > 1 ? parts.slice(0, -1).join('/') || '/' : '/';
   await loadFolder(parent);
 }});
@@ -216,10 +264,25 @@ document.getElementById('folder-close').addEventListener('click', () => folderMo
 folderModal.addEventListener('click', event => {{
   if (event.target === folderModal) folderModal.classList.remove('open');
 }});
+document.getElementById('demo-preset').addEventListener('click', () => {{
+  form.elements.target.value = demoTarget;
+  form.elements.output_dir.value = demoOutput;
+  form.elements.profile.value = 'pro';
+  form.elements.stack.value = 'generic';
+  form.elements.client.value = 'Demo Product Manager';
+  form.elements.scope.value = 'Demo controlada sobre proyecto vulnerable de ejemplo';
+  form.elements.ollama.checked = false;
+}});
+document.getElementById('clear-advanced').addEventListener('click', () => {{
+  form.elements.rules_file.value = '';
+  form.elements.ollama.checked = false;
+  form.elements.ollama_filter_fp.checked = false;
+  form.elements.ollama_limit.value = '5';
+}});
 form.addEventListener('submit', async (event) => {{
   event.preventDefault();
   button.disabled = true;
-  result.innerHTML = '<p>Escaneando y generando entregables...</p>';
+  result.innerHTML = '<div class="empty"><p><strong>Escaneando proyecto...</strong></p><p>Generando informe tecnico, dashboard, JSON, SARIF, baseline y checklist.</p></div>';
   const payload = Object.fromEntries(new FormData(form).entries());
   try {{
     const response = await fetch('/scan', {{
@@ -248,7 +311,7 @@ form.addEventListener('submit', async (event) => {{
       ${{data.custom_rules ? `<p><strong>Reglas custom:</strong> ${{data.custom_rules}}</p>` : ''}}
       <p><strong>SHA256 proyecto:</strong> <code>${{data.project_sha256}}</code></p>
       <div class="links">${{links}}</div>
-      <h2>Primeros hallazgos</h2>
+      <h2>Hallazgos prioritarios</h2>
       ${{findings || '<p>Sin hallazgos.</p>'}}
     `;
   }} catch (error) {{
