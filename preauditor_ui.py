@@ -67,6 +67,7 @@ def page_shell(content: str) -> bytes:
     .secondary:hover {{ background:#eefaf7; color:var(--brand-dark); }}
     .quick-actions {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }}
     .note {{ border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:8px; padding:12px; font-size:13px; }}
+    .warning {{ border:1px solid #facc15; background:#fefce8; color:#854d0e; border-radius:8px; padding:12px; margin:10px 0; font-size:13px; }}
     .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
     .kpi {{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }}
     .kpi span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
@@ -293,6 +294,7 @@ form.addEventListener('submit', async (event) => {{
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Error desconocido');
     const links = Object.entries(data.files).map(([name, path]) => `<a href="/artifact?path=${{encodeURIComponent(path)}}" target="_blank">${{name}}</a>`).join('');
+    const warnings = (data.warnings || []).map(w => `<div class="warning">${{escapeHtml(w)}}</div>`).join('');
     const findings = data.findings.slice(0, 10).map(f => `
       <div class="finding">
         <span class="badge ${{f.severity}}">${{f.severity}}</span>
@@ -309,6 +311,7 @@ form.addEventListener('submit', async (event) => {{
       </div>
       ${{data.ollama ? `<p><strong>Ollama:</strong> reales=${{data.ollama.probable_real}} · revisión=${{data.ollama.requiere_revision}} · falsos positivos=${{data.ollama.probable_falso_positivo}}</p>` : ''}}
       ${{data.custom_rules ? `<p><strong>Reglas custom:</strong> ${{data.custom_rules}}</p>` : ''}}
+      ${{warnings}}
       <p><strong>SHA256 proyecto:</strong> <code>${{data.project_sha256}}</code></p>
       <div class="links">${{links}}</div>
       <h2>Hallazgos prioritarios</h2>
@@ -424,7 +427,7 @@ def scan_project(payload: dict) -> dict:
         "Checklist": output_dir / "checklist-remediacion.md",
     }
     markdown = preauditor.render_markdown(findings, target, profile, meta, project_sha, ollama_assessments=ollama_assessments)
-    preauditor.write_report(
+    pdf_written = preauditor.write_report(
         markdown,
         files["Informe técnico MD"],
         files["Informe técnico HTML"],
@@ -451,6 +454,10 @@ def scan_project(payload: dict) -> dict:
         for assessment in ollama_assessments.values():
             verdict = assessment.get("verdict", "requiere_revision")
             ollama_counts[verdict] = ollama_counts.get(verdict, 0) + 1
+    warnings = []
+    if not pdf_written:
+        warnings.append("PDF no generado: instala reportlab o ejecuta la UI desde un entorno que lo tenga disponible.")
+    existing_files = {name: str(path) for name, path in files.items() if path.exists()}
 
     return {
         "risk": preauditor.global_risk(findings),
@@ -459,7 +466,8 @@ def scan_project(payload: dict) -> dict:
         "ai": {"score": ai_score, "level": ai_level, "reasons": ai_reasons},
         "ollama": ollama_counts,
         "custom_rules": len(custom_rules),
-        "files": {name: str(path) for name, path in files.items()},
+        "warnings": warnings,
+        "files": existing_files,
         "findings": [preauditor.asdict(finding) for finding in findings],
     }
 
