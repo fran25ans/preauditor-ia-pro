@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 import preauditor
+import preauditor_ui
 
 
 class PreauditorRuleTests(unittest.TestCase):
@@ -167,6 +168,28 @@ rules:
             custom_rules = preauditor.load_custom_rules(rules_file)
             findings = preauditor.scan(root, profile="basic", custom_rules=custom_rules)
         self.assertIn("ACME-001", self.rule_ids(findings))
+
+    def test_ui_validates_and_saves_custom_rule_pack(self):
+        rule_text = """
+rules:
+  - id: CLIENT-999
+    title: Patron prohibido por cliente
+    severity: Media
+    category: Politica interna
+    regex: forbidden-client-pattern
+    file_globs:
+      - "*.py"
+    recommendation: Sustituir por el patron aprobado.
+"""
+        rules = preauditor_ui.validate_custom_rules_text(rule_text)
+        self.assertEqual([rule.rule_id for rule in rules], ["CLIENT-999"])
+        with tempfile.TemporaryDirectory() as tmp:
+            rules_file = Path(tmp) / "client-rules.yml"
+            saved = preauditor_ui.save_custom_rules_text(str(rules_file), rule_text)
+            loaded = preauditor_ui.load_custom_rules_text(str(rules_file))
+        self.assertEqual(saved["count"], 1)
+        self.assertEqual(saved["rules"], ["CLIENT-999"])
+        self.assertIn("CLIENT-999", loaded["text"])
 
 
 if __name__ == "__main__":

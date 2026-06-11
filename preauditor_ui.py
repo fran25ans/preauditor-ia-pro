@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import tempfile
 import threading
 import webbrowser
 from datetime import datetime
@@ -91,8 +92,12 @@ def page_shell(content: str) -> bytes:
     .rule-card h3 {{ margin:0 0 8px; color:var(--ink); font-size:15px; text-transform:none; letter-spacing:0; }}
     .rule-meta {{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }}
     .rule-meta span {{ border:1px solid var(--line); border-radius:999px; padding:3px 8px; font-size:12px; color:var(--muted); }}
+    textarea {{ width:100%; min-height:320px; border:1px solid var(--line); border-radius:6px; padding:12px; font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:var(--ink); background:#fbfdff; resize:vertical; }}
+    .editor-actions {{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0; }}
+    .editor-actions button {{ margin-top:0; }}
+    .success {{ border:1px solid #86efac; background:#f0fdf4; color:#166534; border-radius:8px; padding:12px; margin:10px 0; font-size:13px; }}
     .error {{ color:#a31925; font-weight:700; }}
-    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools {{ grid-template-columns:1fr; }} }}
+    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools,.editor-actions {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
 <body>
@@ -151,6 +156,7 @@ def render_home() -> bytes:
       <button type="button" id="clear-advanced" class="secondary">Modo rápido</button>
       <button type="button" id="rules-open" class="secondary">Catálogo de reglas</button>
       <button type="button" id="guided-demo" class="secondary">Demo guiada</button>
+      <button type="button" id="custom-rules-open" class="secondary">Reglas custom</button>
     </div>
     <form id="scan-form">
       <div class="section">
@@ -250,6 +256,27 @@ def render_home() -> bytes:
     </div>
   </div>
 </div>
+<div id="custom-rules-modal" class="modal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <strong>Editor de reglas custom</strong>
+      <button type="button" id="custom-rules-close" class="secondary">Cerrar</button>
+    </div>
+    <div class="modal-body">
+      <p>Las reglas core son de solo lectura. Este editor crea o modifica un pack YAML externo para políticas internas del cliente.</p>
+      <label>Archivo YAML de reglas custom</label>
+      <input id="custom-rules-path" value="{html.escape(str(APP_ROOT / 'custom-rules.yml'))}">
+      <div class="editor-actions">
+        <button type="button" id="custom-template" class="secondary">Plantilla</button>
+        <button type="button" id="custom-load" class="secondary">Cargar</button>
+        <button type="button" id="custom-validate" class="secondary">Validar</button>
+        <button type="button" id="custom-save">Guardar y usar</button>
+      </div>
+      <textarea id="custom-rules-text" spellcheck="false"></textarea>
+      <div id="custom-rules-message"></div>
+    </div>
+  </div>
+</div>
 <div id="folder-modal" class="modal" role="dialog" aria-modal="true">
   <div class="modal-card">
     <div class="modal-head">
@@ -280,6 +307,29 @@ let activePathInput = null;
 const demoTarget = {json.dumps(str(demo_target))};
 const demoOutput = {json.dumps(str(demo_output))};
 const rulesCatalog = {json.dumps(rules_catalog, ensure_ascii=False)};
+const customRulesTemplate = `rules:
+  - id: CLIENT-001
+    title: Flag interno de bypass activado
+    severity: Alta
+    category: Politica interna
+    cvss: 8.1
+    confidence: Media
+    remediation_effort: Baja
+    regexes:
+      - bypassAuth\\s*[:=]\\s*true
+      - DISABLE_AUTH\\s*=\\s*true
+    file_globs:
+      - "*.js"
+      - "*.ts"
+      - "*.py"
+      - "*.env*"
+    description: Detecta flags internos que pueden desactivar autenticacion o controles de seguridad.
+    why_dangerous: Si este flag llega a produccion, puede permitir acceso no autorizado.
+    exploit_concept: Un atacante podria aprovechar endpoints o flujos sin controles efectivos.
+    recommendation: Eliminar el flag o limitarlo a tests aislados fuera de produccion.
+    secure_example: Usar feature flags controlados por entorno y validaciones server-side.
+    reference: Politica interna / OWASP A01 Broken Access Control
+`;
 function escapeHtml(value) {{
   return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
 }}
@@ -397,6 +447,67 @@ document.getElementById('rules-close').addEventListener('click', () => document.
 document.getElementById('rules-modal').addEventListener('click', event => {{
   if (event.target === document.getElementById('rules-modal')) document.getElementById('rules-modal').classList.remove('open');
 }});
+const customRulesModal = document.getElementById('custom-rules-modal');
+const customRulesPath = document.getElementById('custom-rules-path');
+const customRulesText = document.getElementById('custom-rules-text');
+const customRulesMessage = document.getElementById('custom-rules-message');
+function customMessage(kind, message) {{
+  customRulesMessage.innerHTML = `<div class="${{kind}}">${{escapeHtml(message)}}</div>`;
+}}
+document.getElementById('custom-rules-open').addEventListener('click', () => {{
+  customRulesPath.value = form.elements.rules_file.value || customRulesPath.value;
+  if (!customRulesText.value.trim()) customRulesText.value = customRulesTemplate;
+  customRulesMessage.innerHTML = '';
+  customRulesModal.classList.add('open');
+}});
+document.getElementById('custom-rules-close').addEventListener('click', () => customRulesModal.classList.remove('open'));
+customRulesModal.addEventListener('click', event => {{
+  if (event.target === customRulesModal) customRulesModal.classList.remove('open');
+}});
+document.getElementById('custom-template').addEventListener('click', () => {{
+  customRulesText.value = customRulesTemplate;
+  customMessage('success', 'Plantilla cargada. Cambia id, regexes y recomendación para tu cliente.');
+}});
+document.getElementById('custom-load').addEventListener('click', async () => {{
+  try {{
+    const response = await fetch(`/custom-rules?path=${{encodeURIComponent(customRulesPath.value)}}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'No se pudo cargar el archivo');
+    customRulesText.value = data.text;
+    customMessage('success', `Archivo cargado: ${{data.path}}`);
+  }} catch (error) {{
+    customMessage('warning', error.message);
+  }}
+}});
+document.getElementById('custom-validate').addEventListener('click', async () => {{
+  try {{
+    const response = await fetch('/custom-rules/validate', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ text: customRulesText.value }})
+    }});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Reglas invalidas');
+    customMessage('success', `${{data.count}} regla(s) custom validada(s): ${{data.rules.join(', ')}}`);
+  }} catch (error) {{
+    customMessage('warning', error.message);
+  }}
+}});
+document.getElementById('custom-save').addEventListener('click', async () => {{
+  try {{
+    const response = await fetch('/custom-rules/save', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ path: customRulesPath.value, text: customRulesText.value }})
+    }});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'No se pudo guardar');
+    form.elements.rules_file.value = data.path;
+    customMessage('success', `${{data.count}} regla(s) guardada(s). Se usaran en el proximo escaneo.`);
+  }} catch (error) {{
+    customMessage('warning', error.message);
+  }}
+}});
 form.addEventListener('submit', async (event) => {{
   event.preventDefault();
   button.disabled = true;
@@ -496,6 +607,46 @@ def browse_folder(path_value: str) -> dict:
         "parent": str(candidate.parent),
         "directories": directories,
     }
+
+
+def resolve_custom_rules_path(path_value: str) -> Path:
+    if not path_value.strip():
+        raise ValueError("Indica una ruta para el archivo de reglas custom.")
+    path = Path(unquote(path_value)).expanduser()
+    if not path.is_absolute():
+        path = (APP_ROOT / path).resolve()
+    else:
+        path = path.resolve()
+    if path.suffix.lower() not in {".yml", ".yaml", ".json"}:
+        raise ValueError("El archivo de reglas custom debe ser .yml, .yaml o .json.")
+    return path
+
+
+def validate_custom_rules_text(text: str) -> list[preauditor.Rule]:
+    if not text.strip():
+        raise ValueError("El contenido de reglas custom esta vacio.")
+    with tempfile.NamedTemporaryFile("w", suffix=".yml", encoding="utf-8", delete=False) as handle:
+        handle.write(text)
+        temp_path = Path(handle.name)
+    try:
+        return preauditor.load_custom_rules(temp_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def load_custom_rules_text(path_value: str) -> dict:
+    path = resolve_custom_rules_path(path_value)
+    if not path.exists():
+        raise ValueError(f"Archivo no encontrado: {path}")
+    return {"path": str(path), "text": path.read_text(encoding="utf-8", errors="replace")}
+
+
+def save_custom_rules_text(path_value: str, text: str) -> dict:
+    rules = validate_custom_rules_text(text)
+    path = resolve_custom_rules_path(path_value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text.rstrip() + "\n", encoding="utf-8")
+    return {"path": str(path), "count": len(rules), "rules": [rule.rule_id for rule in rules]}
 
 
 def scan_project(payload: dict) -> dict:
@@ -643,16 +794,37 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if parsed.path == "/custom-rules":
+            params = parse_qs(parsed.query)
+            try:
+                body = json.dumps(
+                    load_custom_rules_text(params.get("path", [""])[0]),
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                self.send_response(200)
+            except Exception as exc:
+                body = json.dumps({"error": str(exc)}, ensure_ascii=False).encode("utf-8")
+                self.send_response(400)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         self.send_error(404)
 
     def do_POST(self) -> None:
-        if self.path != "/scan":
+        if self.path not in {"/scan", "/custom-rules/validate", "/custom-rules/save"}:
             self.send_error(404)
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            response = scan_project(payload)
+            if self.path == "/scan":
+                response = scan_project(payload)
+            elif self.path == "/custom-rules/validate":
+                rules = validate_custom_rules_text(payload.get("text", ""))
+                response = {"count": len(rules), "rules": [rule.rule_id for rule in rules]}
+            else:
+                response = save_custom_rules_text(payload.get("path", ""), payload.get("text", ""))
             body = json.dumps(response, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")

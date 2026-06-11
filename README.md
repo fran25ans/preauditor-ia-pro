@@ -350,6 +350,12 @@ Hay una plantilla en `.preauditor-ignore.example`.
 
 Puedes añadir reglas propias sin tocar el motor de Python. Esto sirve para politicas internas, patrones de cliente, nombres de dominios, flags prohibidos o configuraciones que solo aplican a tu empresa.
 
+El diseño recomendado es:
+
+- Reglas core: incluidas en Pre-Auditor IA Pro, versionadas y de solo lectura.
+- Reglas custom: editables por cliente/equipo en un archivo YAML o JSON externo.
+- Triage Ollama: opcional, para justificar o priorizar hallazgos complejos, no para sustituir las reglas.
+
 Ejemplo:
 
 ```yaml
@@ -378,6 +384,26 @@ preauditor ./mi-app --profile pro --rules-file examples/custom-rules.yml --out i
 Campos principales: `id`, `title`, `severity`, `category`, `regex` o `regexes`, `file_globs`, `description`, `why_dangerous`, `exploit_concept`, `recommendation`, `secure_example` y `reference`.
 
 Hay un ejemplo listo en `examples/custom-rules.yml`.
+
+### Editor visual de reglas custom
+
+La UI local incluye un editor para crear o modificar packs de reglas sin tocar `preauditor.py`:
+
+```bash
+preauditor-ui
+```
+
+Abre `http://127.0.0.1:8765/` y pulsa `Reglas custom`.
+
+Desde ahi puedes:
+
+- Cargar una plantilla YAML.
+- Editar reglas propias del cliente.
+- Validar que las regex compilan y que la severidad es correcta.
+- Guardar el archivo `.yml`.
+- Usarlo automaticamente en el siguiente escaneo.
+
+Las reglas internas del catalogo no se editan desde la UI. Esto mantiene trazabilidad y evita alterar el criterio base de auditoria. Para adaptar la herramienta a una empresa, crea un pack externo tipo `acme-rules.yml` y versionalo junto a la politica de seguridad del cliente.
 
 ## Tests de la herramienta
 
