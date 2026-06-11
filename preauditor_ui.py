@@ -68,6 +68,9 @@ def page_shell(content: str) -> bytes:
     .quick-actions {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }}
     .note {{ border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:8px; padding:12px; font-size:13px; }}
     .warning {{ border:1px solid #facc15; background:#fefce8; color:#854d0e; border-radius:8px; padding:12px; margin:10px 0; font-size:13px; }}
+    .progress-list {{ display:grid; gap:8px; margin-top:12px; }}
+    .progress-step {{ border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; color:var(--muted); }}
+    .progress-step.active {{ border-color:var(--brand); color:var(--brand-dark); background:#eefaf7; font-weight:700; }}
     .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
     .kpi {{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }}
     .kpi span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
@@ -81,8 +84,15 @@ def page_shell(content: str) -> bytes:
     .links a {{ border:1px solid var(--line); border-radius:6px; padding:10px; background:#fff; }}
     .empty {{ border:1px dashed var(--line); border-radius:8px; padding:18px; background:#f8fafc; }}
     .empty ul {{ margin:10px 0 0; padding-left:18px; color:var(--muted); }}
+    .rule-tools {{ display:grid; grid-template-columns:1fr 140px 160px 140px; gap:8px; margin-bottom:12px; }}
+    .rule-list {{ border:1px solid var(--line); border-radius:8px; max-height:560px; overflow:auto; }}
+    .rule-card {{ border-bottom:1px solid var(--line); padding:12px; }}
+    .rule-card:last-child {{ border-bottom:0; }}
+    .rule-card h3 {{ margin:0 0 8px; color:var(--ink); font-size:15px; text-transform:none; letter-spacing:0; }}
+    .rule-meta {{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }}
+    .rule-meta span {{ border:1px solid var(--line); border-radius:999px; padding:3px 8px; font-size:12px; color:var(--muted); }}
     .error {{ color:#a31925; font-weight:700; }}
-    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions {{ grid-template-columns:1fr; }} }}
+    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
 <body>
@@ -110,6 +120,27 @@ def render_home() -> bytes:
     stacks = "".join(f"<option value='{s}'>{s}</option>" for s in sorted(preauditor.STACKS))
     demo_target = APP_ROOT / "sample-vulnerable"
     demo_output = APP_ROOT / "deliverables" / "demo-product"
+    rules_by_profile = {
+        profile: {rule.rule_id for rule in preauditor.rules_for_profile(profile)}
+        for profile in sorted(preauditor.PROFILES)
+    }
+    rules_catalog = [
+        {
+            "id": rule.rule_id,
+            "title": rule.title,
+            "severity": rule.severity,
+            "category": rule.category,
+            "cvss": rule.cvss,
+            "confidence": rule.confidence,
+            "effort": rule.remediation_effort,
+            "reference": rule.reference,
+            "description": rule.description,
+            "recommendation": rule.recommendation,
+            "profiles": [profile for profile, ids in rules_by_profile.items() if rule.rule_id in ids],
+        }
+        for rule in preauditor.RULES
+    ]
+    rule_categories = sorted({rule["category"] for rule in rules_catalog})
     content = f"""
 <div class="grid">
   <section class="panel">
@@ -118,6 +149,8 @@ def render_home() -> bytes:
     <div class="quick-actions">
       <button type="button" id="demo-preset" class="secondary">Demo rápida</button>
       <button type="button" id="clear-advanced" class="secondary">Modo rápido</button>
+      <button type="button" id="rules-open" class="secondary">Catálogo de reglas</button>
+      <button type="button" id="guided-demo" class="secondary">Demo guiada</button>
     </div>
     <form id="scan-form">
       <div class="section">
@@ -186,6 +219,37 @@ def render_home() -> bytes:
     </div>
   </section>
 </div>
+<div id="rules-modal" class="modal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <strong>Catálogo de reglas</strong>
+      <button type="button" id="rules-close" class="secondary">Cerrar</button>
+    </div>
+    <div class="modal-body">
+      <p>Reglas determinísticas locales agrupadas por severidad, categoría y perfil. Ollama es una capa opcional de triage, no sustituye estas reglas.</p>
+      <div class="rule-tools">
+        <input id="rule-search" placeholder="Buscar regla, OWASP, categoría...">
+        <select id="rule-severity">
+          <option value="">Severidad</option>
+          <option value="Critica">Crítica</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+        <select id="rule-category">
+          <option value="">Categoría</option>
+          {''.join(f'<option value="{html.escape(category)}">{html.escape(category)}</option>' for category in rule_categories)}
+        </select>
+        <select id="rule-profile">
+          <option value="">Perfil</option>
+          {''.join(f'<option value="{html.escape(profile)}">{html.escape(profile)}</option>' for profile in sorted(preauditor.PROFILES))}
+        </select>
+      </div>
+      <p><strong id="rule-count"></strong></p>
+      <div id="rule-list" class="rule-list"></div>
+    </div>
+  </div>
+</div>
 <div id="folder-modal" class="modal" role="dialog" aria-modal="true">
   <div class="modal-card">
     <div class="modal-head">
@@ -215,8 +279,37 @@ const folderList = document.getElementById('folder-list');
 let activePathInput = null;
 const demoTarget = {json.dumps(str(demo_target))};
 const demoOutput = {json.dumps(str(demo_output))};
+const rulesCatalog = {json.dumps(rules_catalog, ensure_ascii=False)};
 function escapeHtml(value) {{
   return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
+}}
+function renderRules() {{
+  const q = document.getElementById('rule-search').value.toLowerCase();
+  const severity = document.getElementById('rule-severity').value;
+  const category = document.getElementById('rule-category').value;
+  const profile = document.getElementById('rule-profile').value;
+  const filtered = rulesCatalog.filter(rule => (
+    (!severity || rule.severity === severity) &&
+    (!category || rule.category === category) &&
+    (!profile || rule.profiles.includes(profile)) &&
+    (!q || JSON.stringify(rule).toLowerCase().includes(q))
+  ));
+  document.getElementById('rule-count').textContent = `${{filtered.length}} reglas visibles de ${{rulesCatalog.length}}`;
+  document.getElementById('rule-list').innerHTML = filtered.map(rule => `
+    <article class="rule-card">
+      <h3>${{escapeHtml(rule.id)}} · ${{escapeHtml(rule.title)}}</h3>
+      <div class="rule-meta">
+        <span>${{escapeHtml(rule.severity)}}</span>
+        <span>${{escapeHtml(rule.category)}}</span>
+        <span>CVSS~${{escapeHtml(rule.cvss)}}</span>
+        <span>Confianza ${{escapeHtml(rule.confidence)}}</span>
+        <span>${{escapeHtml(rule.profiles.join(', '))}}</span>
+      </div>
+      <p>${{escapeHtml(rule.description)}}</p>
+      <p><strong>Corrección:</strong> ${{escapeHtml(rule.recommendation)}}</p>
+      <p><strong>Referencia:</strong> ${{escapeHtml(rule.reference)}}</p>
+    </article>
+  `).join('');
 }}
 async function loadFolder(path) {{
   folderList.innerHTML = '<div class="browser-row"><span>Cargando...</span></div>';
@@ -280,10 +373,43 @@ document.getElementById('clear-advanced').addEventListener('click', () => {{
   form.elements.ollama_filter_fp.checked = false;
   form.elements.ollama_limit.value = '5';
 }});
+document.getElementById('guided-demo').addEventListener('click', () => {{
+  document.getElementById('demo-preset').click();
+  result.innerHTML = `
+    <div class="empty">
+      <p><strong>Demo guiada preparada.</strong></p>
+      <p>Pulsa “Generar pre-auditoría profesional” y enseña los entregables en este orden:</p>
+      <ul>
+        <li>Dashboard: vista ejecutiva y filtros.</li>
+        <li>Informe técnico HTML: evidencia y remediación.</li>
+        <li>Resumen PDF: entrega para dirección.</li>
+        <li>JSON/SARIF: integración técnica y CI/CD.</li>
+      </ul>
+    </div>
+  `;
+}});
+document.getElementById('rules-open').addEventListener('click', () => {{
+  document.getElementById('rules-modal').classList.add('open');
+  renderRules();
+}});
+document.getElementById('rules-close').addEventListener('click', () => document.getElementById('rules-modal').classList.remove('open'));
+['rule-search','rule-severity','rule-category','rule-profile'].forEach(id => document.getElementById(id).addEventListener('input', renderRules));
+document.getElementById('rules-modal').addEventListener('click', event => {{
+  if (event.target === document.getElementById('rules-modal')) document.getElementById('rules-modal').classList.remove('open');
+}});
 form.addEventListener('submit', async (event) => {{
   event.preventDefault();
   button.disabled = true;
-  result.innerHTML = '<div class="empty"><p><strong>Escaneando proyecto...</strong></p><p>Generando informe tecnico, dashboard, JSON, SARIF, baseline y checklist.</p></div>';
+  result.innerHTML = `
+    <div class="empty">
+      <p><strong>Escaneando proyecto...</strong></p>
+      <div class="progress-list">
+        <div class="progress-step active">1. Leyendo archivos y aplicando reglas locales</div>
+        <div class="progress-step active">2. Priorizando severidad, CVSS y hallazgos compuestos</div>
+        <div class="progress-step active">3. Generando informe, dashboard, JSON, SARIF y checklist</div>
+        <div class="progress-step">4. Preparando enlaces de entrega</div>
+      </div>
+    </div>`;
   const payload = Object.fromEntries(new FormData(form).entries());
   try {{
     const response = await fetch('/scan', {{
@@ -293,7 +419,8 @@ form.addEventListener('submit', async (event) => {{
     }});
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Error desconocido');
-    const links = Object.entries(data.files).map(([name, path]) => `<a href="/artifact?path=${{encodeURIComponent(path)}}" target="_blank">${{name}}</a>`).join('');
+    const preferred = ['Dashboard', 'Informe técnico HTML', 'Resumen PDF', 'Informe técnico MD', 'Hallazgos JSON', 'SARIF', 'Baseline', 'Checklist'];
+    const links = preferred.filter(name => data.files[name]).map(name => `<a href="/artifact?path=${{encodeURIComponent(data.files[name])}}" target="_blank">${{name}}</a>`).join('');
     const warnings = (data.warnings || []).map(w => `<div class="warning">${{escapeHtml(w)}}</div>`).join('');
     const findings = data.findings.slice(0, 10).map(f => `
       <div class="finding">

@@ -3323,6 +3323,13 @@ def render_dashboard(
     button.active {{ background:var(--brand); color:#fff; border-color:var(--brand); }}
     .layout {{ display:grid; grid-template-columns:280px 1fr; gap:18px; }}
     .panel {{ padding:16px; }}
+    .insights {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:0 0 18px; }}
+    .bar-row {{ display:grid; grid-template-columns:96px 1fr 42px; gap:8px; align-items:center; margin:9px 0; }}
+    .bar-track {{ height:10px; background:#edf2f7; border-radius:999px; overflow:hidden; }}
+    .bar-fill {{ height:100%; background:var(--brand); border-radius:999px; }}
+    .bar-fill.Critica {{ background:var(--critical); }} .bar-fill.Alta {{ background:var(--high); }} .bar-fill.Media {{ background:var(--medium); }} .bar-fill.Baja {{ background:var(--low); }}
+    .compound-list {{ display:grid; gap:8px; }}
+    .compound-item {{ border:1px solid #f2b8bd; border-left:4px solid var(--critical); border-radius:8px; padding:10px; background:#fff7f8; }}
     .finding {{ padding:16px; margin-bottom:14px; }}
     .finding.composite {{ border-color:#a31925; box-shadow:0 0 0 2px rgba(163,25,37,.18), 0 0 24px rgba(163,25,37,.22); }}
     .finding-head {{ display:flex; justify-content:space-between; gap:12px; }}
@@ -3333,7 +3340,7 @@ def render_dashboard(
     pre {{ background:#101828; color:#f8fafc; padding:12px; border-radius:8px; overflow:auto; font-size:12px; }}
     .muted {{ color:var(--muted); }}
     .category-row {{ display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:8px 0; }}
-    @media (max-width:900px) {{ .kpis,.toolbar,.layout {{ grid-template-columns:1fr; }} header {{ position:static; }} }}
+    @media (max-width:900px) {{ .kpis,.toolbar,.layout,.insights {{ grid-template-columns:1fr; }} header {{ position:static; }} }}
   </style>
 </head>
 <body>
@@ -3352,6 +3359,24 @@ def render_dashboard(
     </div>
   </header>
   <main>
+    <div class="insights">
+      <section class="panel">
+        <h2>Distribucion por severidad</h2>
+        <div id="severity-chart"></div>
+      </section>
+      <section class="panel">
+        <h2>Hallazgos compuestos</h2>
+        <div id="compound-list"></div>
+      </section>
+      <section class="panel">
+        <h2>Categorias principales</h2>
+        <div id="category-chart"></div>
+      </section>
+      <section class="panel">
+        <h2>Archivos con mas riesgo</h2>
+        <div id="file-chart"></div>
+      </section>
+    </div>
     <div class="toolbar">
       <input id="search" placeholder="Buscar por archivo, regla, descripcion...">
       <select id="severity"><option value="">Todas las severidades</option></select>
@@ -3383,6 +3408,29 @@ def render_dashboard(
     document.getElementById('high').textContent = data.counts.Alta;
     document.getElementById('total').textContent = findings.length;
     document.getElementById('ai').textContent = `${{data.ai_agent_risk.score}}/100`;
+    function barRows(entries, maxValue, classByLabel = false) {{
+      return entries.map(([label, value]) => `
+        <div class="bar-row">
+          <span>${{esc(label)}}</span>
+          <div class="bar-track"><div class="bar-fill ${{classByLabel ? esc(label) : ''}}" style="width:${{maxValue ? Math.max(4, value / maxValue * 100) : 0}}%"></div></div>
+          <strong>${{value}}</strong>
+        </div>
+      `).join('');
+    }}
+    const severityEntries = severityOrder.map(s => [s, data.counts[s] || 0]);
+    document.getElementById('severity-chart').innerHTML = barRows(severityEntries, Math.max(...severityEntries.map(([,v]) => v), 1), true);
+    const categoryEntries = Object.entries(data.categories).sort((a,b) => b[1] - a[1]).slice(0, 6);
+    document.getElementById('category-chart').innerHTML = barRows(categoryEntries, Math.max(...categoryEntries.map(([,v]) => v), 1));
+    const fileCounts = findings.reduce((acc, f) => {{ acc[f.file] = (acc[f.file] || 0) + 1; return acc; }}, {{}});
+    const fileEntries = Object.entries(fileCounts).sort((a,b) => b[1] - a[1]).slice(0, 6);
+    document.getElementById('file-chart').innerHTML = barRows(fileEntries, Math.max(...fileEntries.map(([,v]) => v), 1));
+    const compounds = findings.filter(f => f.rule_id.startsWith('CMP-'));
+    document.getElementById('compound-list').innerHTML = compounds.length ? compounds.map(f => `
+      <div class="compound-item">
+        <strong>${{esc(f.rule_id)}} · ${{esc(f.title)}}</strong>
+        <p><code>${{esc(f.file)}}:${{esc(f.line)}}</code> · ${{esc(f.severity)}} · CVSS ${{esc(f.cvss)}}</p>
+      </div>
+    `).join('') : '<p>No se han detectado cadenas de riesgo compuestas.</p>';
     const sev = document.getElementById('severity');
     severityOrder.forEach(s => sev.append(new Option(s, s)));
     const cat = document.getElementById('category');
