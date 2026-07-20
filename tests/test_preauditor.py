@@ -191,6 +191,67 @@ rules:
         self.assertEqual(saved["rules"], ["CLIENT-999"])
         self.assertIn("CLIENT-999", loaded["text"])
 
+    def test_compare_with_baseline_tracks_before_after(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text('API_KEY = "demo_api_key_not_real_1234567890"\n', encoding="utf-8")
+            before = preauditor.scan(root, profile="basic")
+            meta = preauditor.ReportMeta(
+                client="Demo",
+                auditor="Test",
+                scope="Comparativa",
+                version="test",
+            )
+            baseline = root / "baseline.json"
+            baseline.write_text(
+                preauditor.json.dumps(
+                    preauditor.baseline_payload(before, root, "basic", meta, preauditor.project_hash(root)),
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (root / "app.py").write_text("print('fixed')\n", encoding="utf-8")
+            after = preauditor.scan(root, profile="basic")
+            comparison = preauditor.compare_with_baseline(after, baseline)
+        self.assertIsNotNone(comparison)
+        self.assertEqual(comparison["new"], 0)
+        self.assertGreaterEqual(comparison["fixed"], 1)
+        self.assertEqual(comparison["persistent"], 0)
+        self.assertEqual(comparison["status"], "mejora")
+
+    def test_ui_scan_auto_compares_previous_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "project"
+            output = Path(tmp) / "out"
+            root.mkdir()
+            output.mkdir()
+            (root / "app.py").write_text('API_KEY = "demo_api_key_not_real_1234567890"\n', encoding="utf-8")
+            first = preauditor_ui.scan_project(
+                {
+                    "target": str(root),
+                    "output_dir": str(output),
+                    "profile": "basic",
+                    "stack": "generic",
+                    "client": "Demo",
+                    "auto_compare": "1",
+                }
+            )
+            self.assertIsNone(first["comparison"])
+            (root / "app.py").write_text("print('fixed')\n", encoding="utf-8")
+            second = preauditor_ui.scan_project(
+                {
+                    "target": str(root),
+                    "output_dir": str(output),
+                    "profile": "basic",
+                    "stack": "generic",
+                    "client": "Demo",
+                    "auto_compare": "1",
+                }
+            )
+        self.assertIsNotNone(second["comparison"])
+        self.assertGreaterEqual(second["comparison"]["fixed"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

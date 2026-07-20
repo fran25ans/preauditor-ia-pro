@@ -96,8 +96,15 @@ def page_shell(content: str) -> bytes:
     .editor-actions {{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0; }}
     .editor-actions button {{ margin-top:0; }}
     .success {{ border:1px solid #86efac; background:#f0fdf4; color:#166534; border-radius:8px; padding:12px; margin:10px 0; font-size:13px; }}
+    .comparison {{ border:1px solid #99f6e4; background:#f0fdfa; border-radius:8px; padding:14px; margin:12px 0 18px; }}
+    .comparison.regresion {{ border-color:#fecaca; background:#fef2f2; }}
+    .comparison.estable {{ border-color:#d8dee8; background:#f8fafc; }}
+    .comparison-grid {{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }}
+    .comparison-grid div {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; }}
+    .comparison-grid span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
+    .comparison-grid strong {{ display:block; margin-top:4px; font-size:20px; }}
     .error {{ color:#a31925; font-weight:700; }}
-    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools,.editor-actions {{ grid-template-columns:1fr; }} }}
+    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools,.editor-actions,.comparison-grid {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
 <body>
@@ -191,6 +198,9 @@ def render_home() -> bytes:
         <h3>Opciones avanzadas</h3>
         <label>Reglas custom YAML/JSON</label>
         <input name="rules_file" placeholder="/ruta/a/preauditor-rules.yml">
+        <label class="check"><input type="checkbox" name="auto_compare" value="1" checked> Comparar con baseline anterior de la carpeta de salida</label>
+        <label>Baseline anterior opcional</label>
+        <input name="compare_baseline" placeholder="/ruta/a/baseline.json">
         <label class="check"><input type="checkbox" name="ollama" value="1"> Triage local con Ollama</label>
         <label>Modelo Ollama</label>
         <input name="ollama_model" value="llama3.1">
@@ -419,6 +429,8 @@ document.getElementById('demo-preset').addEventListener('click', () => {{
 }});
 document.getElementById('clear-advanced').addEventListener('click', () => {{
   form.elements.rules_file.value = '';
+  form.elements.compare_baseline.value = '';
+  form.elements.auto_compare.checked = true;
   form.elements.ollama.checked = false;
   form.elements.ollama_filter_fp.checked = false;
   form.elements.ollama_limit.value = '5';
@@ -539,6 +551,18 @@ form.addEventListener('submit', async (event) => {{
         <strong>${{f.rule_id}} · ${{f.title}}</strong>
         <p><code>${{f.file}}:${{f.line}}</code> · CVSS ${{f.cvss}} · ${{f.category}}</p>
       </div>`).join('');
+    const comparison = data.comparison ? `
+      <div class="comparison ${{data.comparison.status}}">
+        <p><strong>Comparativa antes/después:</strong> ${{data.comparison.status}}</p>
+        <p>Baseline: <code>${{escapeHtml(data.comparison.baseline)}}</code></p>
+        <div class="comparison-grid">
+          <div><span>Nuevos</span><strong>${{data.comparison.new}}</strong></div>
+          <div><span>Corregidos</span><strong>${{data.comparison.fixed}}</strong></div>
+          <div><span>Persistentes</span><strong>${{data.comparison.persistent}}</strong></div>
+          <div><span>Mejora</span><strong>${{data.comparison.improvement_percent}}%</strong></div>
+        </div>
+      </div>
+    ` : '';
     result.innerHTML = `
       <div class="kpis">
         <div class="kpi"><span>Riesgo</span><strong>${{data.risk}}</strong></div>
@@ -549,6 +573,7 @@ form.addEventListener('submit', async (event) => {{
       </div>
       ${{data.ollama ? `<p><strong>Ollama:</strong> reales=${{data.ollama.probable_real}} · revisión=${{data.ollama.requiere_revision}} · falsos positivos=${{data.ollama.probable_falso_positivo}}</p>` : ''}}
       ${{data.custom_rules ? `<p><strong>Reglas custom:</strong> ${{data.custom_rules}}</p>` : ''}}
+      ${{comparison}}
       ${{warnings}}
       <p><strong>SHA256 proyecto:</strong> <code>${{data.project_sha256}}</code></p>
       <div class="links">${{links}}</div>
@@ -704,7 +729,22 @@ def scan_project(payload: dict) -> dict:
         "Baseline": output_dir / "baseline.json",
         "Checklist": output_dir / "checklist-remediacion.md",
     }
-    markdown = preauditor.render_markdown(findings, target, profile, meta, project_sha, ollama_assessments=ollama_assessments)
+    compare_value = payload.get("compare_baseline", "").strip()
+    compare_path = Path(compare_value).expanduser().resolve() if compare_value else None
+    auto_compare = bool(payload.get("auto_compare"))
+    if not compare_path and auto_compare and files["Baseline"].exists():
+        compare_path = files["Baseline"]
+    comparison = preauditor.compare_with_baseline(findings, compare_path)
+
+    markdown = preauditor.render_markdown(
+        findings,
+        target,
+        profile,
+        meta,
+        project_sha,
+        comparison=comparison,
+        ollama_assessments=ollama_assessments,
+    )
     pdf_written = preauditor.write_report(
         markdown,
         files["Informe técnico MD"],
@@ -716,9 +756,18 @@ def scan_project(payload: dict) -> dict:
         files["Resumen PDF"],
         files["Dashboard"],
         project_sha,
+        comparison=comparison,
         ollama_assessments=ollama_assessments,
     )
-    preauditor.write_json(findings, files["Hallazgos JSON"], profile, meta, project_sha, ollama_assessments=ollama_assessments)
+    preauditor.write_json(
+        findings,
+        files["Hallazgos JSON"],
+        profile,
+        meta,
+        project_sha,
+        comparison=comparison,
+        ollama_assessments=ollama_assessments,
+    )
     preauditor.write_sarif(findings, files["SARIF"])
     files["Baseline"].write_text(
         json.dumps(preauditor.baseline_payload(findings, target, profile, meta, project_sha), ensure_ascii=False, indent=2),
@@ -744,6 +793,7 @@ def scan_project(payload: dict) -> dict:
         "ai": {"score": ai_score, "level": ai_level, "reasons": ai_reasons},
         "ollama": ollama_counts,
         "custom_rules": len(custom_rules),
+        "comparison": comparison,
         "warnings": warnings,
         "files": existing_files,
         "findings": [preauditor.asdict(finding) for finding in findings],

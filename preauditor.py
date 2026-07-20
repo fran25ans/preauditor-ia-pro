@@ -2602,11 +2602,34 @@ def compare_with_baseline(findings: list[Finding], baseline_path: Path | None) -
     new_keys = sorted(set(current) - set(previous))
     fixed_keys = sorted(set(previous) - set(current))
     persistent_keys = sorted(set(current) & set(previous))
+    previous_counts = {severity: 0 for severity in SEVERITY_ORDER}
+    for item in previous.values():
+        severity = item.get("severity")
+        if severity in previous_counts:
+            previous_counts[severity] += 1
+    current_counts = severity_counts(findings)
+    previous_total = len(previous)
+    current_total = len(current)
+    improvement_percent = round((len(fixed_keys) / previous_total) * 100, 1) if previous_total else 0.0
+    if len(fixed_keys) > len(new_keys):
+        status = "mejora"
+    elif len(new_keys) > len(fixed_keys):
+        status = "regresion"
+    else:
+        status = "estable"
     return {
         "baseline": str(baseline_path),
         "new": len(new_keys),
         "fixed": len(fixed_keys),
         "persistent": len(persistent_keys),
+        "previous_total": previous_total,
+        "current_total": current_total,
+        "previous_counts": previous_counts,
+        "current_counts": current_counts,
+        "critical_delta": current_counts["Critica"] - previous_counts["Critica"],
+        "high_delta": current_counts["Alta"] - previous_counts["Alta"],
+        "improvement_percent": improvement_percent,
+        "status": status,
         "new_findings": [asdict(current[key]) for key in new_keys],
         "fixed_findings": [previous[key] for key in fixed_keys],
     }
@@ -3330,6 +3353,13 @@ def render_dashboard(
     .bar-fill.Critica {{ background:var(--critical); }} .bar-fill.Alta {{ background:var(--high); }} .bar-fill.Media {{ background:var(--medium); }} .bar-fill.Baja {{ background:var(--low); }}
     .compound-list {{ display:grid; gap:8px; }}
     .compound-item {{ border:1px solid #f2b8bd; border-left:4px solid var(--critical); border-radius:8px; padding:10px; background:#fff7f8; }}
+    .comparison-panel {{ margin:0 0 18px; padding:18px; background:#ecfdf5; border:1px solid #99f6e4; border-radius:8px; }}
+    .comparison-panel.regresion {{ background:#fef2f2; border-color:#fecaca; }}
+    .comparison-panel.estable {{ background:#f8fafc; border-color:var(--line); }}
+    .comparison-grid {{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:10px; }}
+    .comparison-grid div {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; }}
+    .comparison-grid span {{ color:var(--muted); font-size:12px; text-transform:uppercase; display:block; }}
+    .comparison-grid strong {{ display:block; margin-top:4px; font-size:22px; }}
     .finding {{ padding:16px; margin-bottom:14px; }}
     .finding.composite {{ border-color:#a31925; box-shadow:0 0 0 2px rgba(163,25,37,.18), 0 0 24px rgba(163,25,37,.22); }}
     .finding-head {{ display:flex; justify-content:space-between; gap:12px; }}
@@ -3340,7 +3370,7 @@ def render_dashboard(
     pre {{ background:#101828; color:#f8fafc; padding:12px; border-radius:8px; overflow:auto; font-size:12px; }}
     .muted {{ color:var(--muted); }}
     .category-row {{ display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:8px 0; }}
-    @media (max-width:900px) {{ .kpis,.toolbar,.layout,.insights {{ grid-template-columns:1fr; }} header {{ position:static; }} }}
+    @media (max-width:900px) {{ .kpis,.toolbar,.layout,.insights,.comparison-grid {{ grid-template-columns:1fr; }} header {{ position:static; }} }}
   </style>
 </head>
 <body>
@@ -3359,6 +3389,7 @@ def render_dashboard(
     </div>
   </header>
   <main>
+    <section id="comparison-panel"></section>
     <div class="insights">
       <section class="panel">
         <h2>Distribucion por severidad</h2>
@@ -3408,6 +3439,21 @@ def render_dashboard(
     document.getElementById('high').textContent = data.counts.Alta;
     document.getElementById('total').textContent = findings.length;
     document.getElementById('ai').textContent = `${{data.ai_agent_risk.score}}/100`;
+    if (data.comparison) {{
+      document.getElementById('comparison-panel').innerHTML = `
+        <div class="comparison-panel ${{esc(data.comparison.status)}}">
+          <h2>Comparativa antes/despues · ${{esc(data.comparison.status)}}</h2>
+          <p><code>${{esc(data.comparison.baseline)}}</code></p>
+          <div class="comparison-grid">
+            <div><span>Antes</span><strong>${{data.comparison.previous_total}}</strong></div>
+            <div><span>Ahora</span><strong>${{data.comparison.current_total}}</strong></div>
+            <div><span>Nuevos</span><strong>${{data.comparison.new}}</strong></div>
+            <div><span>Corregidos</span><strong>${{data.comparison.fixed}}</strong></div>
+            <div><span>Mejora</span><strong>${{data.comparison.improvement_percent}}%</strong></div>
+          </div>
+        </div>
+      `;
+    }}
     function barRows(entries, maxValue, classByLabel = false) {{
       return entries.map(([label, value]) => `
         <div class="bar-row">

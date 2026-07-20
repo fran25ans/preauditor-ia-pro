@@ -104,6 +104,7 @@ Desde esa pantalla puedes:
 - indicar la ruta del proyecto
 - seleccionar perfil y stack
 - rellenar cliente, auditor, alcance y version
+- comparar contra un `baseline.json` anterior para ver antes/despues
 - activar triage local con Ollama si lo tienes arrancado
 - generar el pack completo de entrega
 - abrir informe, PDF, dashboard, JSON, SARIF, baseline y checklist
@@ -291,6 +292,15 @@ preauditor ./mi-app --profile pro --compare baseline.json --out informe-comparad
 ```
 
 La salida indica hallazgos nuevos, corregidos y persistentes.
+
+En la UI local, la opcion `Comparar con baseline anterior de la carpeta de salida` viene activada por defecto. El flujo recomendado es:
+
+1. Ejecutar un primer escaneo para generar `baseline.json`.
+2. Corregir hallazgos en el proyecto.
+3. Ejecutar de nuevo usando la misma carpeta de salida.
+4. Revisar la tarjeta `Comparativa antes/despues` en la UI y en el dashboard.
+
+Esto permite demostrar progreso: hallazgos nuevos, corregidos, persistentes y porcentaje de mejora.
 
 ## Triage local con Ollama
 
