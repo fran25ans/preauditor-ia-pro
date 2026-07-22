@@ -242,7 +242,9 @@ preauditor ./mi-app \
   --json findings.json
 ```
 
-La opción también está disponible en la UI local en el campo `Idioma de informes`. Al seleccionar `English`, el Markdown, HTML, PDF, dashboard, checklist, JSON y baseline conservan el idioma elegido en sus metadatos.
+La opción también está disponible en la UI local en el campo `Idioma de informes`. Al seleccionar `English`, el Markdown, HTML, PDF, dashboard, checklist, JSON, SARIF y baseline conservan el idioma elegido en sus metadatos y muestran los hallazgos core en inglés.
+
+Las evidencias y fragmentos de código se mantienen literalmente como aparecen en el proyecto auditado. Las reglas custom se muestran en el idioma en que estén escritas en su YAML/JSON.
 
 ## Perfiles
 

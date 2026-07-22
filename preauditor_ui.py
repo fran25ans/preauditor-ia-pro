@@ -697,7 +697,7 @@ form.addEventListener('submit', async (event) => {{
       </div>`).join('');
     const comparison = data.comparison ? `
       <div class="comparison ${{data.comparison.status}}">
-        <p><strong>${{resultText.beforeAfter}}:</strong> ${{data.comparison.status}}</p>
+        <p><strong>${{resultText.beforeAfter}}:</strong> ${{data.comparison_status_label || data.comparison.status}}</p>
         <p>Baseline: <code>${{escapeHtml(data.comparison.baseline)}}</code></p>
         <div class="comparison-grid">
           <div><span>${{resultText.new}}</span><strong>${{data.comparison.new}}</strong></div>
@@ -882,13 +882,24 @@ def scan_project(payload: dict) -> dict:
     if stack not in preauditor.STACKS:
         raise ValueError(f"Stack invalido: {stack}")
 
+    language = payload.get("language", "es") if payload.get("language", "es") in preauditor.LANGUAGES else "es"
+    client = payload.get("client", "Cliente no especificado")
+    auditor = payload.get("auditor", "Consultor especializado")
+    scope = payload.get("scope", "Análisis preliminar local de seguridad")
+    if language == "en":
+        if client == "Cliente no especificado":
+            client = "Unspecified client"
+        if auditor == "Consultor especializado":
+            auditor = "Specialist reviewer"
+        if scope == "Análisis preliminar local de seguridad":
+            scope = "Local preliminary security assessment"
     meta = preauditor.ReportMeta(
-        client=payload.get("client", "Cliente no especificado"),
-        auditor=payload.get("auditor", "Consultor especializado"),
-        scope=payload.get("scope", "Análisis preliminar local de seguridad"),
+        client=client,
+        auditor=auditor,
+        scope=scope,
         version=payload.get("report_version", "1.0"),
         stack=stack,
-        language=payload.get("language", "es") if payload.get("language", "es") in preauditor.LANGUAGES else "es",
+        language=language,
     )
     rules_file = payload.get("rules_file", "").strip()
     custom_rules = preauditor.load_custom_rules(Path(rules_file).expanduser().resolve() if rules_file else None)
@@ -968,7 +979,7 @@ def scan_project(payload: dict) -> dict:
         ollama_assessments=ollama_assessments,
         review_records=review_records,
     )
-    preauditor.write_sarif(findings, files["SARIF"])
+    preauditor.write_sarif(findings, files["SARIF"], meta.language)
     files["Baseline"].write_text(
         json.dumps(preauditor.baseline_payload(findings, target, profile, meta, project_sha, review_records), ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -1008,11 +1019,12 @@ def scan_project(payload: dict) -> dict:
         "ollama": ollama_counts,
         "custom_rules": len(custom_rules),
         "comparison": comparison,
+        "comparison_status_label": preauditor.comparison_status_label(comparison["status"], meta.language) if comparison else None,
         "review_counts": preauditor.review_counts(findings, review_records),
         "review_path": str(files["Review"]),
         "warnings": warnings,
         "files": existing_files,
-        "findings": [preauditor.finding_payload(finding, review_records) for finding in findings],
+        "findings": [preauditor.finding_payload(finding, review_records, meta.language) for finding in findings],
     }
 
 

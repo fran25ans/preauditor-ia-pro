@@ -79,6 +79,16 @@ LEVEL_LABELS_EN = {
     "Bajo": "Low",
 }
 
+AI_REASON_LABELS_EN = {
+    "herramientas sensibles disponibles": "sensitive tools available",
+    "workspace marcado como confiable": "workspace marked as trusted",
+    "prompt cargado desde workspace/PR": "prompt loaded from workspace/PR",
+    "permisos de escritura sobre GitHub": "GitHub write permissions",
+    "posible ejecucion de codigo influida por IA": "possible AI-influenced code execution",
+    "permisos CI/CD elevados": "elevated CI/CD permissions",
+    "autonomia elevada": "elevated autonomy",
+}
+
 LANGUAGES = {
     "es": "Español",
     "en": "English",
@@ -115,6 +125,260 @@ STACKS = {
     "node": "Node.js",
     "flutter": "Flutter/mobile",
     "wordpress": "WordPress/PHP",
+}
+
+CATEGORY_LABELS_EN = {
+    "API": "API",
+    "Archivos": "Files",
+    "Autenticacion": "Authentication",
+    "CI/CD": "CI/CD",
+    "Cloud": "Cloud",
+    "Configuracion": "Configuration",
+    "Contenedores": "Containers",
+    "Criptografia": "Cryptography",
+    "Ejecucion": "Execution",
+    "Frontend": "Frontend",
+    "IA": "AI",
+    "Infraestructura": "Infrastructure",
+    "Inyeccion": "Injection",
+    "Kubernetes": "Kubernetes",
+    "Privacidad": "Privacy",
+    "Resiliencia": "Resilience",
+    "Secretos": "Secrets",
+    "Sesion": "Session",
+    "Supply Chain": "Supply Chain",
+    "Transporte": "Transport",
+}
+
+CONFIDENCE_LABELS_EN = {"Alta": "High", "Media": "Medium", "Baja": "Low"}
+EFFORT_LABELS_EN = {"Alta": "High", "Media": "Medium", "Baja": "Low"}
+
+RULE_TITLES_EN = {
+    "SEC-001": "Possible exposed secret or API key",
+    "SEC-002": "Environment or credentials file included",
+    "SEC-003": "Open CORS configuration",
+    "SEC-004": "Endpoint appears to lack authentication",
+    "SEC-005": "Excessive GitHub Actions permissions",
+    "SEC-006": "Dynamic code or command execution",
+    "SEC-007": "Visible or embedded system prompt",
+    "SEC-008": "AI output without structured validation",
+    "SEC-009": "AI agent with elevated autonomy",
+    "SEC-010": "AI tool with overly broad permissions",
+    "SEC-011": "Logs may contain sensitive information",
+    "SEC-012": "File upload without evident validation",
+    "SEC-013": "SQL query built through concatenation",
+    "SEC-014": "TLS verification disabled",
+    "SEC-015": "Debug mode enabled",
+    "SEC-016": "Unsafe deserialization",
+    "SEC-017": "JWT decoded without verification",
+    "SEC-018": "Weak cryptography",
+    "SEC-019": "Permissive or unsafe CSP",
+    "SEC-020": "Docker running as root or privileged",
+    "SEC-021": "Broad network exposure in infrastructure",
+    "SEC-022": "Potential SSRF through user-controlled URL",
+    "SEC-023": "Secrets defined in Dockerfile",
+    "SEC-024": "Remote installation script executed by shell",
+    "SEC-025": "Cookies missing security attributes",
+    "SEC-026": "AI agent workspace marked as trusted",
+    "SEC-027": "Agent prompt loaded from PR workspace",
+    "SEC-028": "GitHub token used in visible command",
+    "SEC-029": "AI agent can write to PRs or issues",
+    "SEC-030": "Absolute agent instructions against untrusted content",
+    "SEC-031": "Workflow runs with pull_request_target",
+    "SEC-032": "GitHub Action not pinned to a commit",
+    "SEC-033": "PR checkout with persist-credentials enabled",
+    "SEC-034": "Dependency installed without a fixed version",
+    "SEC-035": "Docker image uses latest tag",
+    "SEC-036": "Kubernetes allows privileged container",
+    "SEC-037": "Kubernetes mounts hostPath",
+    "SEC-038": "Kubernetes runs as root",
+    "SEC-039": "RBAC grants cluster-admin",
+    "SEC-040": "Terraform IAM wildcard",
+    "SEC-041": "Public S3 bucket or open ACL",
+    "SEC-042": "Database publicly exposed",
+    "SEC-043": "Firewall allows administration from the Internet",
+    "SEC-044": "Authentication or authorization disabled",
+    "SEC-045": "Default password or credentials",
+    "SEC-046": "Unsafe or missing password hashing",
+    "SEC-047": "Potential open redirect",
+    "SEC-048": "Potential XXE in XML parser",
+    "SEC-049": "Potential path traversal",
+    "SEC-050": "Potential XSS from unescaped HTML",
+    "SEC-051": "Rate limiting missing or disabled",
+    "SEC-052": "Webhook without signature verification",
+    "SEC-053": "CORS with credentials and wildcard",
+    "SEC-054": "AI model may receive secrets or sensitive context",
+    "SEC-055": "RAG or embeddings without source control",
+    "SEC-056": "AI-generated code execution",
+    "SEC-057": "AI logs or telemetry may contain sensitive content",
+    "SEC-058": "OAuth client secret or private key in CI variables",
+    "SEC-059": "OIDC write permissions in CI",
+    "SEC-060": "sudo used in pipeline",
+    "SEC-061": "HSTS header missing or disabled",
+    "SEC-062": "Permissive clickjacking header",
+    "SEC-063": "Cookies configured with SameSite=None",
+    "SEC-064": "JWT with none algorithm or weak secret",
+    "SEC-065": "Wildcard or localhost OAuth redirect URI",
+    "SEC-066": "OAuth state/nonce missing or disabled",
+    "SEC-067": "Legacy TLS allowed",
+    "SEC-068": "Encryption at rest disabled",
+    "SEC-069": "Backups or retention disabled",
+    "SEC-070": "Personal data in logs",
+    "SEC-071": "Dependency cache includes secrets or env files",
+    "SEC-072": "Docker copies the entire context",
+    "SEC-073": "Docker ADD uses a remote URL",
+    "SEC-074": "Kubernetes service account token auto-mounted",
+    "SEC-075": "Broad Linux capabilities in container",
+    "SEC-076": "Read-only root filesystem not defined",
+    "SEC-077": "GraphQL introspection enabled",
+    "SEC-078": "Detailed errors exposed",
+    "SEC-079": "CORS reflects dynamic origin",
+    "SEC-080": "AI moderation or output validation policy missing",
+    "SEC-081": "Swagger or API documentation exposed",
+    "SEC-082": "Actuator or detailed health endpoint exposed",
+    "SEC-083": "Elasticsearch or Kibana without authentication",
+    "SEC-084": "Redis without authentication or exposed",
+    "SEC-085": "MongoDB without authentication or open bind",
+    "SEC-086": "RabbitMQ or broker with default credentials",
+    "SEC-087": "Kafka PLAINTEXT or without authentication",
+    "SEC-088": "MinIO or S3-compatible storage with default credentials",
+    "SEC-089": "Lockfile missing in Node project",
+    "SEC-090": "npm install used in CI instead of npm ci",
+    "SEC-091": "Wildcard dependency version",
+    "SEC-092": "Local path dependency in manifest",
+    "SEC-093": "Package manager integrity verification disabled",
+    "SEC-094": "Destructive command in pipeline",
+    "SEC-095": "Terraform backend without encryption or locking",
+    "SEC-096": "Sensitive Terraform output not marked",
+    "SEC-097": "Azure Storage allows public access",
+    "SEC-098": "Public GCP bucket",
+    "SEC-099": "MFA disabled or not required",
+    "SEC-100": "Anti-replay protection missing",
+    "CMP-001": "Compound AI agent CI/CD risk",
+    "CMP-002": "Open CORS with credentials",
+}
+
+EN_CATEGORY_TEXTS = {
+    "Secrets": {
+        "description": "The scanner found evidence of secrets, credentials, keys, or sensitive values in code or configuration.",
+        "why": "Exposed secrets can allow direct access to services, data, cloud resources, or internal systems without passing through application controls.",
+        "exploit": "An attacker with repository or artifact access could reuse the value to authenticate, exfiltrate data, or pivot into connected systems.",
+        "recommendation": "Revoke affected credentials, remove them from code and history when needed, and store runtime values in a managed secrets service.",
+    },
+    "API": {
+        "description": "The scanner found an API pattern that may weaken authentication, authorization, request validation, or exposure control.",
+        "why": "API misconfigurations can expose sensitive endpoints, allow cross-origin abuse, or make protected operations reachable by unintended clients.",
+        "exploit": "An attacker could call the affected endpoint or browser-facing API path directly and abuse missing or overly permissive controls.",
+        "recommendation": "Apply explicit authentication and authorization, restrict public exposure, validate requests, and document any intentional public routes.",
+    },
+    "AI": {
+        "description": "The scanner found an AI workflow pattern that may increase prompt injection, excessive agency, unsafe output handling, or data exposure risk.",
+        "why": "AI systems can amplify unsafe inputs when models, tools, memory, or agent permissions are not constrained by deterministic controls.",
+        "exploit": "An attacker could manipulate model input or retrieved context to trigger unauthorized actions, leak data, or influence downstream logic.",
+        "recommendation": "Constrain tools with least privilege, validate model outputs with schemas, isolate untrusted content, and require human approval for sensitive actions.",
+    },
+    "CI/CD": {
+        "description": "The scanner found a CI/CD configuration pattern that may increase pipeline compromise, token misuse, or unsafe automation risk.",
+        "why": "Pipelines often hold privileged tokens and deployment paths; weak controls can turn a code or dependency issue into account or production compromise.",
+        "exploit": "An attacker who influences pipeline execution could read secrets, write to the repository, publish artifacts, or deploy untrusted code.",
+        "recommendation": "Use least privilege per job, separate untrusted pull request code from secrets, pin actions, and protect release/deployment workflows.",
+    },
+    "Supply Chain": {
+        "description": "The scanner found a dependency or build integrity pattern that may reduce reproducibility or increase supply-chain exposure.",
+        "why": "Mutable versions, remote scripts, weak integrity checks, or unpinned actions can introduce unreviewed code into builds.",
+        "exploit": "A compromised dependency, registry, action, or remote script could execute in CI or production without an explicit application code change.",
+        "recommendation": "Pin versions and actions, use lockfiles, verify checksums/signatures when possible, and prefer reproducible installation commands.",
+    },
+    "Infrastructure": {
+        "description": "The scanner found an infrastructure pattern that may expose services, administrative interfaces, or data stores.",
+        "why": "Infrastructure services often provide direct access to data, logs, queues, caches, or administrative capabilities.",
+        "exploit": "An attacker with network reachability could enumerate services, authenticate with weak settings, extract data, or disrupt operations.",
+        "recommendation": "Restrict network exposure, enable authentication and TLS, apply least privilege, and isolate administrative surfaces from the public Internet.",
+    },
+    "Cloud": {
+        "description": "The scanner found a cloud configuration pattern that may expose resources, weaken access control, or leak sensitive state.",
+        "why": "Cloud misconfigurations can make storage, databases, IAM permissions, or infrastructure state accessible beyond the intended trust boundary.",
+        "exploit": "An attacker could enumerate public resources, access sensitive objects, or abuse overbroad permissions to move laterally.",
+        "recommendation": "Disable public access by default, scope IAM policies tightly, encrypt sensitive resources, and review environment-specific exposure.",
+    },
+    "Kubernetes": {
+        "description": "The scanner found a Kubernetes workload or RBAC pattern that may weaken cluster isolation.",
+        "why": "Privileged pods, host mounts, root execution, and broad RBAC can allow container compromise to affect nodes or cluster resources.",
+        "exploit": "An attacker who compromises the workload could access host files, service account tokens, or cluster APIs with elevated permissions.",
+        "recommendation": "Run as non-root, remove privileged mode and hostPath where possible, reduce RBAC scope, and use restrictive pod security settings.",
+    },
+    "Containers": {
+        "description": "The scanner found a container build or runtime pattern that may weaken isolation or increase image risk.",
+        "why": "Containers running with broad privileges, mutable bases, or excessive filesystem access increase the impact of application compromise.",
+        "exploit": "An attacker with code execution in the container could pivot to the host, modify files, or abuse unnecessary Linux capabilities.",
+        "recommendation": "Use non-root users, drop capabilities, avoid privileged mode, pin base images, and keep writable paths explicit.",
+    },
+    "Authentication": {
+        "description": "The scanner found an authentication or authorization pattern that may weaken identity, session, or access controls.",
+        "why": "Weak authentication controls make credential theft, token misuse, or unauthorized access more likely to become a real compromise.",
+        "exploit": "An attacker could bypass checks, reuse weak tokens, abuse missing MFA, or redirect authentication flows to attacker-controlled destinations.",
+        "recommendation": "Require strong authentication, validate tokens and OAuth parameters, enable MFA for sensitive roles, and enforce authorization server-side.",
+    },
+    "Session": {
+        "description": "The scanner found a session or cookie pattern that may weaken browser-side protection.",
+        "why": "Missing cookie protections can increase exposure to theft, cross-site abuse, or unintended credential transmission.",
+        "exploit": "An attacker could combine browser behavior with XSS, CSRF, or network exposure to reuse or influence session state.",
+        "recommendation": "Set Secure, HttpOnly, and appropriate SameSite attributes, and align cookie behavior with the authentication model.",
+    },
+    "Privacy": {
+        "description": "The scanner found a privacy pattern that may expose personal data or sensitive operational details.",
+        "why": "Sensitive data in logs, telemetry, or analytics can spread across systems with different retention and access controls.",
+        "exploit": "An attacker or overprivileged insider with observability access could recover tokens, personal data, or internal identifiers.",
+        "recommendation": "Minimize collected data, mask sensitive values, limit retention, and restrict access to logs and telemetry.",
+    },
+    "Files": {
+        "description": "The scanner found a file-handling pattern that may require stricter validation or storage controls.",
+        "why": "Unsafe file handling can allow traversal, malicious uploads, overwrites, malware storage, or resource exhaustion.",
+        "exploit": "An attacker could upload unexpected content, manipulate filenames or paths, or consume storage and processing resources.",
+        "recommendation": "Validate file type, size, extension, and storage path; generate server-side names and keep uploads outside executable locations.",
+    },
+    "Injection": {
+        "description": "The scanner found an injection-prone pattern where untrusted input may influence interpreters, parsers, or queries.",
+        "why": "Injection issues can lead to data exposure, command execution, parser abuse, or execution of attacker-controlled content.",
+        "exploit": "An attacker could craft input that changes query logic, parser behavior, generated HTML, command arguments, or serialized data.",
+        "recommendation": "Use parameterized APIs, strict parsers, escaping/encoding, allowlists, and avoid dynamic execution of untrusted content.",
+    },
+    "Execution": {
+        "description": "The scanner found a pattern that may execute dynamic code or operating system commands.",
+        "why": "Dynamic execution expands the impact of input validation failures and can turn data injection into remote command execution.",
+        "exploit": "An attacker could influence arguments or code strings to run arbitrary instructions in the application environment.",
+        "recommendation": "Avoid eval/exec and shell execution; use typed APIs, fixed command allowlists, and argument arrays without shell interpolation.",
+    },
+    "Transport": {
+        "description": "The scanner found a transport security pattern that may weaken encrypted communication.",
+        "why": "Weak TLS settings or missing transport headers can expose traffic to interception, downgrade, or browser-side misuse.",
+        "exploit": "An attacker on the network path could intercept, downgrade, or tamper with communications when clients accept weak transport controls.",
+        "recommendation": "Enforce modern TLS, validate certificates, enable HSTS where appropriate, and remove insecure transport exceptions.",
+    },
+    "Cryptography": {
+        "description": "The scanner found a cryptographic pattern that may use weak algorithms, unsafe hashing, or disabled encryption.",
+        "why": "Weak cryptography can expose protected data, passwords, tokens, or stored objects to offline attack or unauthorized disclosure.",
+        "exploit": "An attacker with captured hashes, ciphertext, or storage access could recover sensitive data more easily.",
+        "recommendation": "Use modern vetted primitives, strong password hashing, managed key storage, and encryption at rest for sensitive data.",
+    },
+    "Frontend": {
+        "description": "The scanner found a frontend security pattern that may weaken browser-side protections.",
+        "why": "Frontend sinks and headers influence whether injected content, framing, or browser behavior can be abused.",
+        "exploit": "An attacker could inject or frame content, steal session data, or abuse permissive browser policies.",
+        "recommendation": "Sanitize/encode untrusted content, avoid unsafe HTML sinks, and set restrictive browser security headers.",
+    },
+    "Configuration": {
+        "description": "The scanner found a configuration pattern that may expose diagnostics, debug behavior, or unsafe defaults.",
+        "why": "Debug and diagnostic settings can reveal internals, versions, stack traces, or operational details useful for attackers.",
+        "exploit": "An attacker could trigger errors or access diagnostic endpoints to map the system and prepare targeted attacks.",
+        "recommendation": "Disable debug behavior in production, restrict diagnostics, and separate local development settings from production configuration.",
+    },
+    "Resilience": {
+        "description": "The scanner found a resilience pattern that may reduce recovery or increase operational impact.",
+        "why": "Missing backups, retention, or deletion protection can turn incidents into data loss or prolonged service disruption.",
+        "exploit": "An attacker or accidental operation could delete or corrupt data without a reliable recovery path.",
+        "recommendation": "Enable backups, retention, deletion protection, and regular restore validation for critical systems.",
+    },
 }
 
 DEFAULT_EXCLUDES = {
@@ -312,11 +576,83 @@ def level_label(level: str, lang: str = "es") -> str:
     return level
 
 
+def ai_reason_labels(reasons: list[str], lang: str = "es") -> list[str]:
+    if lang == "en":
+        return [AI_REASON_LABELS_EN.get(reason, reason) for reason in reasons]
+    return reasons
+
+
 def stack_label(stack: str, lang: str = "es") -> str:
     label = STACKS.get(stack, stack)
     if lang == "en" and label == "Stack generico":
         return "Generic stack"
     return label
+
+
+def category_label(category: str, lang: str = "es") -> str:
+    if lang == "en":
+        return CATEGORY_LABELS_EN.get(category, category)
+    return category
+
+
+def confidence_label(confidence: str, lang: str = "es") -> str:
+    if lang == "en":
+        return CONFIDENCE_LABELS_EN.get(confidence, confidence)
+    return confidence
+
+
+def effort_label(effort: str, lang: str = "es") -> str:
+    if lang == "en":
+        return EFFORT_LABELS_EN.get(effort, effort)
+    return effort
+
+
+def localized_finding(finding: Finding, lang: str = "es") -> Finding:
+    if lang != "en":
+        return finding
+    title = RULE_TITLES_EN.get(finding.rule_id, finding.title)
+    category = category_label(finding.category, lang)
+    category_texts = EN_CATEGORY_TEXTS.get(
+        category,
+        {
+            "description": f"The scanner detected evidence related to {title.lower()}.",
+            "why": "The detected pattern may create security risk depending on the runtime context and exposure.",
+            "exploit": "An attacker could abuse the affected behavior if the surrounding controls are missing or ineffective.",
+            "recommendation": "Validate the finding manually and apply the control recommended by the responsible security team.",
+        },
+    )
+    if finding.rule_id.startswith("CMP-"):
+        category_texts = {
+            "description": "The scanner detected a compound risk created by multiple related findings.",
+            "why": "The combined evidence increases practical risk beyond each isolated issue.",
+            "exploit": "An attacker could chain the related weaknesses to reach a higher-impact outcome.",
+            "recommendation": "Fix the related findings together and validate the combined attack path manually.",
+        }
+    return Finding(
+        rule_id=finding.rule_id,
+        title=title,
+        severity=finding.severity,
+        category=category,
+        cvss=finding.cvss,
+        confidence=confidence_label(finding.confidence, lang),
+        remediation_effort=effort_label(finding.remediation_effort, lang),
+        file=finding.file,
+        line=finding.line,
+        evidence=finding.evidence,
+        context=finding.context,
+        fingerprint=finding.fingerprint,
+        description=category_texts["description"],
+        why_dangerous=category_texts["why"],
+        exploit_concept=category_texts["exploit"],
+        recommendation=category_texts["recommendation"],
+        secure_example=finding.secure_example,
+        reference=finding.reference,
+        related_findings=finding.related_findings,
+    )
+
+
+def localized_findings(findings: list[Finding], lang: str = "es") -> list[Finding]:
+    return [localized_finding(finding, lang) for finding in findings]
 
 
 def parse_inline_list(value: str) -> list[str]:
@@ -2626,21 +2962,46 @@ def priority_for(finding: Finding) -> str:
     return "P4"
 
 
-def manual_validation_points(findings: list[Finding]) -> list[str]:
+def manual_validation_points(findings: list[Finding], language: str = "es") -> list[str]:
+    lang = report_language(language=language)
     points: list[str] = []
     ids = {finding.rule_id for finding in findings}
     if {"SEC-003", "SEC-053", "CMP-002"} & ids:
-        points.append("Confirmar si la configuracion CORS aplica a produccion o solo a entornos locales/controlados.")
+        points.append(
+            "Confirm whether the CORS configuration applies to production or only to local/controlled environments."
+            if lang == "en"
+            else "Confirmar si la configuracion CORS aplica a produccion o solo a entornos locales/controlados."
+        )
     if {"SEC-004"} & ids:
-        points.append("Validar si los endpoints marcados como sin autenticacion estan protegidos por middleware externo, gateway o proxy.")
+        points.append(
+            "Validate whether endpoints marked as unauthenticated are protected by external middleware, gateway, or proxy controls."
+            if lang == "en"
+            else "Validar si los endpoints marcados como sin autenticacion estan protegidos por middleware externo, gateway o proxy."
+        )
     if {"SEC-026", "SEC-027", "CMP-001"} & ids:
-        points.append("Confirmar si el workflow de agente IA procesa Pull Requests de contribuidores externos o ramas no confiables.")
+        points.append(
+            "Confirm whether the AI-agent workflow processes pull requests from external contributors or untrusted branches."
+            if lang == "en"
+            else "Confirmar si el workflow de agente IA procesa Pull Requests de contribuidores externos o ramas no confiables."
+        )
     if {"SEC-055"} & ids:
-        points.append("Revisar si el RAG filtra documentos por usuario, tenant, permisos y fuente de confianza.")
+        points.append(
+            "Review whether the RAG flow filters documents by user, tenant, permissions, and trusted source."
+            if lang == "en"
+            else "Revisar si el RAG filtra documentos por usuario, tenant, permisos y fuente de confianza."
+        )
     if {"SEC-058", "SEC-059"} & ids:
-        points.append("Validar condiciones de uso de secretos/OIDC en CI y si pueden ejecutarse con codigo procedente de PR.")
+        points.append(
+            "Validate CI secret/OIDC usage conditions and whether they can execute with code originating from pull requests."
+            if lang == "en"
+            else "Validar condiciones de uso de secretos/OIDC en CI y si pueden ejecutarse con codigo procedente de PR."
+        )
     if not points and findings:
-        points.append("Validar manualmente los hallazgos criticos y altos para confirmar explotabilidad, alcance real e impacto de negocio.")
+        points.append(
+            "Manually validate critical and high findings to confirm exploitability, real scope, and business impact."
+            if lang == "en"
+            else "Validar manualmente los hallazgos criticos y altos para confirmar explotabilidad, alcance real e impacto de negocio."
+        )
     return points
 
 
@@ -2757,9 +3118,14 @@ def review_counts(findings: list[Finding], review_records: dict[str, dict] | Non
     return counts
 
 
-def finding_payload(finding: Finding, review_records: dict[str, dict] | None = None) -> dict:
-    payload = asdict(finding)
-    payload["review"] = review_for_finding(finding, review_records)
+def finding_payload(finding: Finding, review_records: dict[str, dict] | None = None, language: str = "es") -> dict:
+    lang = report_language(language=language)
+    localized = localized_finding(finding, lang)
+    payload = asdict(localized)
+    review = dict(review_for_finding(finding, review_records))
+    if lang == "en":
+        review["title"] = localized.title
+    payload["review"] = review
     return payload
 
 
@@ -2771,6 +3137,13 @@ def baseline_payload(
     project_sha: str,
     review_records: dict[str, dict] | None = None,
 ) -> dict:
+    lang = report_language(meta)
+    def baseline_review(finding: Finding) -> dict:
+        review = dict(review_for_finding(finding, review_records))
+        if lang == "en":
+            review["title"] = localized_finding(finding, lang).title
+        return review
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "target": str(target),
@@ -2781,12 +3154,12 @@ def baseline_payload(
             {
                 "key": finding_key(finding),
                 "rule_id": finding.rule_id,
-                "title": finding.title,
+                "title": localized_finding(finding, lang).title,
                 "severity": finding.severity,
                 "file": finding.file,
                 "line": finding.line,
                 "fingerprint": finding.fingerprint,
-                "review": review_for_finding(finding, review_records),
+                "review": baseline_review(finding),
             }
             for finding in findings
         ],
@@ -3066,17 +3439,17 @@ def business_impact(findings: list[Finding], lang: str = "es") -> str:
     categories = {finding.category for finding in findings}
     if lang == "en":
         impacts_en = []
-        if "Secretos" in categories:
+        if "Secretos" in categories or "Secrets" in categories:
             impacts_en.append("possible credential compromise and access to external services")
         if "API" in categories:
             impacts_en.append("exposure of endpoints or data to unauthorized clients")
-        if "IA" in categories:
+        if "IA" in categories or "AI" in categories:
             impacts_en.append("risk of prompt injection, unauthorized actions, or unsafe AI output handling")
         if "CI/CD" in categories:
             impacts_en.append("higher impact if pipelines or dependencies are compromised")
-        if "Privacidad" in categories:
+        if "Privacidad" in categories or "Privacy" in categories:
             impacts_en.append("possible leakage of sensitive data into logging systems")
-        if "Archivos" in categories:
+        if "Archivos" in categories or "Files" in categories:
             impacts_en.append("risk of abuse in file upload workflows")
         if not impacts_en:
             return "No business impact was identified with the current automated rules."
@@ -3121,6 +3494,8 @@ def render_markdown(
     )
     lang = report_language(meta)
     if lang == "en":
+        display_findings = localized_findings(findings, lang)
+        categories = category_counts(display_findings)
         disclaimer_en = (
             "This automated assessment does not replace expert review. "
             "Findings must be validated by a specialist because false positives, "
@@ -3167,7 +3542,7 @@ def render_markdown(
                 "### AI Agent Risk Score",
                 "",
                 f"- AI agent risk: **{ai_score}/100 — {level_label(ai_level, lang)}**",
-                f"- Factors: {', '.join(ai_reasons) if ai_reasons else 'No specific AI agent risk factors were detected.'}",
+                f"- Factors: {', '.join(ai_reason_labels(ai_reasons, lang)) if ai_reasons else 'No specific AI agent risk factors were detected.'}",
                 "",
             ]
         )
@@ -3200,7 +3575,7 @@ def render_markdown(
                     "",
                 ]
             )
-        validation_points = manual_validation_points(findings)
+        validation_points = manual_validation_points(findings, lang)
         reviews = review_counts(findings, review_records)
         lines.extend(
             [
@@ -3227,14 +3602,14 @@ def render_markdown(
         else:
             lines.append("- No affected categories.")
         lines.extend(["", "### Files with Most Findings", ""])
-        ranked_files = top_files(findings)
+        ranked_files = top_files(display_findings)
         if ranked_files:
             for file, count in ranked_files:
                 lines.append(f"- `{file}`: {count}")
         else:
             lines.append("- No affected files.")
         lines.extend(["", "### Priorities", ""])
-        priority_findings = [f for f in findings if f.severity in {"Critica", "Alta"}][:10]
+        priority_findings = [f for f in display_findings if f.severity in {"Critica", "Alta"}][:10]
         if priority_findings:
             for finding in priority_findings:
                 lines.append(
@@ -3243,7 +3618,7 @@ def render_markdown(
         else:
             lines.append("- No critical or high findings were identified with the current rules.")
         lines.extend(["", "## Technical Report", ""])
-        if not findings:
+        if not display_findings:
             lines.extend(
                 [
                     "No findings were detected with the current rule set.",
@@ -3252,7 +3627,7 @@ def render_markdown(
                 ]
             )
             return "\n".join(lines) + "\n"
-        for index, finding in enumerate(findings, start=1):
+        for index, finding in enumerate(display_findings, start=1):
             review = review_for_finding(finding, review_records)
             lines.extend(
                 [
@@ -3598,6 +3973,7 @@ def render_html_en(
     ollama_assessments: dict[str, dict] | None = None,
     review_records: dict[str, dict] | None = None,
 ) -> str:
+    findings = localized_findings(findings, "en")
     counts = severity_counts(findings)
     categories = category_counts(findings)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -3651,7 +4027,7 @@ def render_html_en(
       <p><strong>Likely real:</strong> {verdict_counts.get('probable_real', 0)} · <strong>Needs review:</strong> {verdict_counts.get('requiere_revision', 0)} · <strong>Likely false positives:</strong> {verdict_counts.get('probable_falso_positivo', 0)}</p>
     </section>
 """
-    manual_html = "".join(f"<li>{html.escape(point)}</li>" for point in manual_validation_points(findings))
+    manual_html = "".join(f"<li>{html.escape(point)}</li>" for point in manual_validation_points(findings, "en"))
     finding_cards = []
     for index, finding in enumerate(findings, start=1):
         assessment = (ollama_assessments or {}).get(finding_key(finding))
@@ -3739,7 +4115,7 @@ def render_html_en(
       <p><strong>Date:</strong> {html.escape(now)} · <strong>Profile:</strong> {html.escape(profile)} · <strong>Active rules:</strong> {len(rules_for_profile(profile))}</p>
       <p><strong>Business impact:</strong> {html.escape(business_impact(findings, 'en'))}</p>
     </section>
-    <section class="panel"><h2>AI Agent Risk Score</h2><p><strong>{ai_score}/100 — {html.escape(level_label(ai_level, 'en'))}</strong></p><p>{html.escape(', '.join(ai_reasons) if ai_reasons else 'No specific AI agent risk factors were detected.')}</p></section>
+    <section class="panel"><h2>AI Agent Risk Score</h2><p><strong>{ai_score}/100 — {html.escape(level_label(ai_level, 'en'))}</strong></p><p>{html.escape(', '.join(ai_reason_labels(ai_reasons, 'en')) if ai_reasons else 'No specific AI agent risk factors were detected.')}</p></section>
     {comparison_html}
     {ollama_html}
     {review_html}
@@ -4025,6 +4401,7 @@ def render_dashboard(
     review_records: dict[str, dict] | None = None,
 ) -> str:
     lang = report_language(meta)
+    display_findings = localized_findings(findings, lang)
     dashboard_text = {
         "html_lang": "en" if lang == "en" else "es",
         "risk": "Risk" if lang == "en" else "Riesgo",
@@ -4072,12 +4449,12 @@ def render_dashboard(
             "comparison": comparison,
             "ollama_triage": ollama_assessments or {},
             "review_counts": review_counts(findings, review_records),
-            "ai_agent_risk": {"score": ai_score, "level": level_label(ai_level, lang), "raw_level": ai_level, "reasons": ai_reasons},
-            "risk": global_risk(findings),
-            "counts": severity_counts(findings),
-            "categories": category_counts(findings),
-            "average_cvss": average_cvss(findings),
-            "findings": [finding_payload(finding, review_records) for finding in findings],
+            "ai_agent_risk": {"score": ai_score, "level": level_label(ai_level, lang), "reasons": ai_reason_labels(ai_reasons, lang)},
+            "risk": risk_label(global_risk(findings), lang),
+            "counts": severity_counts(display_findings),
+            "categories": category_counts(display_findings),
+            "average_cvss": average_cvss(display_findings),
+            "findings": [finding_payload(finding, review_records, lang) for finding in display_findings],
         },
         ensure_ascii=False,
     )
@@ -4321,6 +4698,7 @@ def write_pdf_report(
     story = []
     counts = severity_counts(findings)
     lang = report_language(meta)
+    display_findings = localized_findings(findings, lang)
 
     def p(text: str, style: str = "BodyText") -> Paragraph:
         return Paragraph(html.escape(str(text)).replace("\n", "<br/>"), styles[style])
@@ -4367,7 +4745,7 @@ def write_pdf_report(
     ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
     story.append(p("AI Agent Risk Score", "Heading1"))
     story.append(p(f"{ai_score}/100 — {level_label(ai_level, lang)}"))
-    story.append(p(", ".join(ai_reasons) if ai_reasons else ("No specific AI agent risk factors were detected." if lang == "en" else "No se detectaron factores específicos de agente IA.")))
+    story.append(p(", ".join(ai_reason_labels(ai_reasons, lang)) if ai_reasons else ("No specific AI agent risk factors were detected." if lang == "en" else "No se detectaron factores específicos de agente IA.")))
     story.append(Spacer(1, 12))
     if comparison:
         story.append(p("Baseline Comparison" if lang == "en" else "Comparativa contra baseline", "Heading1"))
@@ -4419,7 +4797,7 @@ def write_pdf_report(
     story.append(p("Validation Priorities" if lang == "en" else "Prioridades de validación", "Heading1"))
 
     priority_rows = [["Severity", "Finding", "Location", "CVSS"]] if lang == "en" else [["Severidad", "Hallazgo", "Ubicación", "CVSS"]]
-    for finding in findings[:12]:
+    for finding in display_findings[:12]:
         priority_rows.append([severity_label(finding.severity, lang), finding.title, f"{finding.file}:{finding.line}", finding.cvss])
     priority_table = Table(priority_rows, colWidths=[58, 220, 170, 45], hAlign="LEFT")
     priority_table.setStyle(
@@ -4438,7 +4816,7 @@ def write_pdf_report(
     story.append(Spacer(1, 18))
     story.append(p("Technical Detail" if lang == "en" else "Detalle técnico", "Heading1"))
 
-    for finding in findings:
+    for finding in display_findings:
         story.append(p(f"{finding.rule_id} · {finding.title}", "Heading2"))
         if lang == "en":
             story.append(p(f"Severity: {severity_label(finding.severity, lang)} · CVSS: {finding.cvss} · Category: {finding.category} · Location: {finding.file}:{finding.line}"))
@@ -4518,6 +4896,8 @@ def write_json(
     ollama_assessments: dict[str, dict] | None = None,
     review_records: dict[str, dict] | None = None,
 ) -> None:
+    lang = report_language(meta)
+    display_findings = localized_findings(findings, lang)
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -4529,14 +4909,14 @@ def write_json(
         "review_counts": review_counts(findings, review_records),
         "ai_agent_risk": {
             "score": ai_agent_risk_score(findings)[0],
-            "level": ai_agent_risk_score(findings)[1],
-            "reasons": ai_agent_risk_score(findings)[2],
+            "level": level_label(ai_agent_risk_score(findings)[1], lang),
+            "reasons": ai_reason_labels(ai_agent_risk_score(findings)[2], lang),
         },
-        "risk": global_risk(findings),
-        "average_cvss": average_cvss(findings),
-        "counts": severity_counts(findings),
-        "categories": category_counts(findings),
-        "findings": [finding_payload(finding, review_records) for finding in findings],
+        "risk": risk_label(global_risk(findings), lang),
+        "average_cvss": average_cvss(display_findings),
+        "counts": severity_counts(display_findings),
+        "categories": category_counts(display_findings),
+        "findings": [finding_payload(finding, review_records, lang) for finding in findings],
     }
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -4544,8 +4924,9 @@ def write_json(
 def write_checklist(findings: list[Finding], output: Path, language: str = "es") -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     lang = report_language(language=language)
+    display_findings = localized_findings(findings, lang)
     lines = ["# Remediation Checklist" if lang == "en" else "# Checklist de remediación", ""]
-    for finding in findings:
+    for finding in display_findings:
         lines.extend(
             [
                 f"- [ ] **{priority_for(finding)} / {severity_label(finding.severity, lang)}** `{finding.rule_id}` {finding.title}",
@@ -4558,22 +4939,26 @@ def write_checklist(findings: list[Finding], output: Path, language: str = "es")
     output.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_sarif(findings: list[Finding], output: Path) -> None:
+def write_sarif(findings: list[Finding], output: Path, language: str = "es") -> None:
+    lang = report_language(language=language)
+    display_findings = localized_findings(findings, lang)
     output.parent.mkdir(parents=True, exist_ok=True)
     rules = {}
-    for finding in findings:
+    for finding in display_findings:
+        help_text = (
+            f"{finding.why_dangerous}\n\n"
+            + (
+                f"Recommendation: {finding.recommendation}\n\nReference: {finding.reference}"
+                if lang == "en"
+                else f"Recomendación: {finding.recommendation}\n\nReferencia: {finding.reference}"
+            )
+        )
         rules[finding.rule_id] = {
             "id": finding.rule_id,
             "name": finding.title,
             "shortDescription": {"text": finding.title},
             "fullDescription": {"text": finding.description},
-            "help": {
-                "text": (
-                    f"{finding.why_dangerous}\n\n"
-                    f"Recomendación: {finding.recommendation}\n\n"
-                    f"Referencia: {finding.reference}"
-                )
-            },
+            "help": {"text": help_text},
             "properties": {
                 "category": finding.category,
                 "severity": finding.severity,
@@ -4615,7 +5000,7 @@ def write_sarif(findings: list[Finding], output: Path) -> None:
                         ],
                         "partialFingerprints": {"preauditor": finding.fingerprint},
                     }
-                    for finding in findings
+                    for finding in display_findings
                 ],
             }
         ],
@@ -4733,10 +5118,20 @@ def main() -> int:
         print(f"Target invalido: {target}")
         return 2
 
+    client = args.client
+    auditor = args.auditor
+    scope = args.scope
+    if args.language == "en":
+        if client == "Cliente no especificado":
+            client = "Unspecified client"
+        if auditor == "Consultor especializado":
+            auditor = "Specialist reviewer"
+        if scope == "Análisis preliminar automático local":
+            scope = "Local automated preliminary assessment"
     meta = ReportMeta(
-        client=args.client,
-        auditor=args.auditor,
-        scope=args.scope,
+        client=client,
+        auditor=auditor,
+        scope=scope,
         version=args.report_version,
         stack=args.stack,
         language=args.language,
@@ -4806,7 +5201,7 @@ def main() -> int:
     if json_path:
         write_json(findings, json_path, args.profile, meta, project_sha, comparison, ollama_assessments)
     if sarif_path:
-        write_sarif(findings, sarif_path)
+        write_sarif(findings, sarif_path, meta.language)
     if baseline_path:
         baseline_path.parent.mkdir(parents=True, exist_ok=True)
         baseline_path.write_text(

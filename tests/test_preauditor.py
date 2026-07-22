@@ -156,12 +156,22 @@ class PreauditorRuleTests(unittest.TestCase):
         dashboard = preauditor.render_dashboard(findings, Path("/tmp/project"), "basic", meta)
         with tempfile.TemporaryDirectory() as tmp:
             checklist = Path(tmp) / "checklist.md"
+            findings_json = Path(tmp) / "findings.json"
+            findings_sarif = Path(tmp) / "findings.sarif"
             preauditor.write_checklist(findings, checklist, "en")
+            preauditor.write_json(findings, findings_json, "basic", meta)
+            preauditor.write_sarif(findings, findings_sarif, "en")
             checklist_text = checklist.read_text(encoding="utf-8")
+            json_text = findings_json.read_text(encoding="utf-8")
+            sarif_text = findings_sarif.read_text(encoding="utf-8")
         self.assertIn("Preliminary Security Assessment Report", markdown)
+        self.assertIn("Possible exposed secret or API key", markdown)
+        self.assertNotIn("Posible secreto o API key expuesta", markdown)
         self.assertIn("Executive Summary", html_report)
         self.assertIn("Distribution by Severity", dashboard)
         self.assertIn("Remediation Checklist", checklist_text)
+        self.assertIn("Possible exposed secret or API key", json_text)
+        self.assertIn("Possible exposed secret or API key", sarif_text)
 
     def test_parse_ollama_json_with_extra_text(self):
         parsed = preauditor.parse_ollama_json(
