@@ -68,6 +68,12 @@ class PreauditorRuleTests(unittest.TestCase):
         self.assertIn("SEC-003", ids)
         self.assertIn("SEC-053", ids)
         self.assertIn("CMP-002", ids)
+        composite = next(f for f in findings if f.rule_id == "CMP-002")
+        self.assertEqual(composite.line, 3)
+        self.assertEqual([item["rule_id"] for item in composite.related_findings], ["SEC-003", "SEC-053"])
+        self.assertEqual([item["line"] for item in composite.related_findings], [3, 4])
+        self.assertIn("allow_origins", composite.related_findings[0]["evidence"])
+        self.assertIn("allow_credentials", composite.related_findings[1]["evidence"])
 
     def test_detects_ai_pr_composite(self):
         findings = self.scan_fixture(
@@ -91,6 +97,10 @@ class PreauditorRuleTests(unittest.TestCase):
         self.assertIn("CMP-001", self.rule_ids(findings))
         composite = next(f for f in findings if f.rule_id == "CMP-001")
         self.assertEqual(composite.severity, "Critica")
+        related_ids = {item["rule_id"] for item in composite.related_findings}
+        self.assertTrue({"SEC-026", "SEC-027"} <= related_ids)
+        self.assertTrue(related_ids & {"SEC-005", "SEC-029", "SEC-058", "SEC-059"})
+        self.assertNotEqual(composite.context, "")
 
     def test_suppresses_rule_by_id(self):
         findings = self.scan_fixture(

@@ -147,6 +147,7 @@ class Finding:
     recommendation: str
     secure_example: str
     reference: str
+    related_findings: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -2343,6 +2344,33 @@ def make_finding(rule: Rule, relative: str, line_number: int, line: str, lines: 
     )
 
 
+def related_finding_entry(finding: Finding) -> dict[str, object]:
+    return {
+        "rule_id": finding.rule_id,
+        "title": finding.title,
+        "file": finding.file,
+        "line": finding.line,
+        "evidence": finding.evidence,
+    }
+
+
+def composite_related(file_findings: list[Finding], rule_ids: set[str]) -> tuple[dict[str, object], ...]:
+    related = [
+        finding
+        for finding in file_findings
+        if finding.rule_id in rule_ids
+    ]
+    related.sort(key=lambda finding: (finding.line, finding.rule_id))
+    return tuple(related_finding_entry(finding) for finding in related)
+
+
+def composite_context(related: tuple[dict[str, object], ...]) -> str:
+    return "\n".join(
+        f"{item['file']}:{item['line']} [{item['rule_id']}] {item['evidence']}"
+        for item in related
+    )
+
+
 def add_composite_findings(findings: list[Finding]) -> list[Finding]:
     composites: list[Finding] = []
     by_file = sorted({finding.file for finding in findings})
@@ -2351,7 +2379,8 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
         rule_ids = {finding.rule_id for finding in file_findings}
 
         if {"SEC-026", "SEC-027"} <= rule_ids and rule_ids.intersection({"SEC-005", "SEC-029", "SEC-058", "SEC-059"}):
-            first = min(file_findings, key=lambda finding: finding.line)
+            related = composite_related(file_findings, {"SEC-005", "SEC-026", "SEC-027", "SEC-029", "SEC-058", "SEC-059"})
+            first_line = min(int(item["line"]) for item in related)
             fingerprint = hashlib.sha256(f"CMP-001:{file}".encode()).hexdigest()[:12]
             composites.append(
                 Finding(
@@ -2363,9 +2392,9 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
                     confidence="Alta",
                     remediation_effort="Alta",
                     file=file,
-                    line=first.line,
-                    evidence=" + ".join(sorted(rule_ids.intersection({"SEC-005", "SEC-026", "SEC-027", "SEC-029", "SEC-058", "SEC-059"}))),
-                    context=first.context,
+                    line=first_line,
+                    evidence=" + ".join(item["rule_id"] for item in related),
+                    context=composite_context(related),
                     fingerprint=fingerprint,
                     description="Se combinan workspace confiable, prompt cargado desde el PR y permisos/capacidades de escritura o secretos en CI.",
                     why_dangerous="La combinacion permite que una PR modifique instrucciones del agente y que el agente opere con permisos reales sobre GitHub o secretos.",
@@ -2373,11 +2402,13 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
                     recommendation="Separar prompt confiable del workspace, desactivar trust_workspace, reducir permisos a lectura y exigir aprobacion humana para escritura.",
                     secure_example="GEMINI_CLI_TRUST_WORKSPACE: 'false'\npermissions:\n  contents: read\n  pull-requests: read",
                     reference="OWASP LLM01 Prompt Injection / OWASP LLM06 Excessive Agency / OWASP CI/CD Security",
+                    related_findings=related,
                 )
             )
 
         if {"SEC-003", "SEC-053"} <= rule_ids:
-            first = min(file_findings, key=lambda finding: finding.line)
+            related = composite_related(file_findings, {"SEC-003", "SEC-053"})
+            first_line = min(int(item["line"]) for item in related)
             fingerprint = hashlib.sha256(f"CMP-002:{file}".encode()).hexdigest()[:12]
             composites.append(
                 Finding(
@@ -2389,9 +2420,9 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
                     confidence="Alta",
                     remediation_effort="Baja",
                     file=file,
-                    line=first.line,
-                    evidence="SEC-003 + SEC-053",
-                    context=first.context,
+                    line=first_line,
+                    evidence=" + ".join(item["rule_id"] for item in related),
+                    context=composite_context(related),
                     fingerprint=fingerprint,
                     description="Se detecta una combinacion de origen CORS abierto y credenciales habilitadas.",
                     why_dangerous="Permite que navegadores envien credenciales a la API desde origenes no confiables si la configuracion efectiva lo permite.",
@@ -2399,6 +2430,7 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
                     recommendation="Usa allowlist exacta de origenes y evita credenciales salvo necesidad justificada.",
                     secure_example="cors({ origin: ['https://app.example.com'], credentials: true })",
                     reference="OWASP API Security API7 Security Misconfiguration",
+                    related_findings=related,
                 )
             )
     return findings + composites
@@ -2633,6 +2665,47 @@ def compare_with_baseline(findings: list[Finding], baseline_path: Path | None) -
         "new_findings": [asdict(current[key]) for key in new_keys],
         "fixed_findings": [previous[key] for key in fixed_keys],
     }
+
+
+def related_findings_markdown(finding: Finding) -> list[str]:
+    if not finding.related_findings:
+        return []
+    lines = [
+        "**Hallazgo compuesto:** la severidad procede de la combinacion de varias evidencias relacionadas.",
+        "",
+        "| Regla | Ubicacion | Evidencia |",
+        "|---|---|---|",
+    ]
+    for item in finding.related_findings:
+        lines.append(
+            f"| `{item['rule_id']}` | `{item['file']}:{item['line']}` | `{item['evidence']}` |"
+        )
+    lines.append("")
+    return lines
+
+
+def related_findings_html(finding: Finding) -> str:
+    if not finding.related_findings:
+        return ""
+    rows = "".join(
+        (
+            "<tr>"
+            f"<td><code>{html.escape(str(item['rule_id']))}</code></td>"
+            f"<td><code>{html.escape(str(item['file']))}:{html.escape(str(item['line']))}</code></td>"
+            f"<td><code>{html.escape(str(item['evidence']))}</code></td>"
+            "</tr>"
+        )
+        for item in finding.related_findings
+    )
+    return f"""
+        <div class="related-findings">
+          <p><strong>Hallazgo compuesto:</strong> la severidad procede de la combinación de varias evidencias relacionadas.</p>
+          <table>
+            <thead><tr><th>Regla</th><th>Ubicación</th><th>Evidencia</th></tr></thead>
+            <tbody>{rows}</tbody>
+          </table>
+        </div>
+"""
 
 
 def severity_at_least(severity: str, threshold: str) -> bool:
@@ -2998,6 +3071,7 @@ def render_markdown(
                     "",
                 ]
             )
+        lines.extend(related_findings_markdown(finding))
         lines.extend(
             [
                 "**Contexto:**",
@@ -3116,7 +3190,6 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
           <div>
             <p class="eyebrow">{html.escape(finding.rule_id)} · {html.escape(finding.category)}</p>
             <h3>{index}. {html.escape(finding.title)}</h3>
-            {"<p><strong>Hallazgo compuesto:</strong> combinacion de riesgos que debe priorizarse.</p>" if finding.rule_id.startswith("CMP-") else ""}
             <p><code>{html.escape(finding.file)}:{finding.line}</code> · fingerprint <code>{html.escape(finding.fingerprint)}</code></p>
           </div>
           <div class="scorebox">
@@ -3130,6 +3203,7 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
           <div><span>Esfuerzo</span><strong>{html.escape(finding.remediation_effort)}</strong></div>
           <div><span>SLA sugerido</span><strong>{html.escape(remediation_sla(finding))}</strong></div>
         </div>
+        {related_findings_html(finding)}
         <pre>{html.escape(finding.context)}</pre>
         {f"<div class='meta-grid'><div><span>Ollama</span><strong>{html.escape(assessment.get('verdict', 'requiere_revision'))}</strong></div><div><span>Confianza IA</span><strong>{html.escape(assessment.get('confidence', 'Baja'))}</strong></div><div><span>Validacion</span><strong>{html.escape(assessment.get('auditor_validation', 'Revisar manualmente'))}</strong></div></div><p>{html.escape(assessment.get('rationale', ''))}</p>" if assessment else ""}
         <dl>
@@ -3201,6 +3275,8 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
     .meta-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }}
     .meta-grid div {{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }}
     .meta-grid span {{ display: block; color: var(--muted); font-size: 12px; }}
+    .related-findings {{ border: 1px solid #f2b8bd; background: #fff7f8; border-radius: 8px; padding: 12px; margin-top: 16px; }}
+    .related-findings table {{ margin-top: 8px; }}
     dl {{ display: grid; grid-template-columns: 210px 1fr; gap: 8px 18px; }}
     dt {{ font-weight: 700; color: #263244; }}
     dd {{ margin: 0; }}
@@ -3370,6 +3446,9 @@ def render_dashboard(
     pre {{ background:#101828; color:#f8fafc; padding:12px; border-radius:8px; overflow:auto; font-size:12px; }}
     .muted {{ color:var(--muted); }}
     .category-row {{ display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:8px 0; }}
+    .related-findings {{ border:1px solid #f2b8bd; background:#fff7f8; border-radius:8px; padding:12px; margin:12px 0; }}
+    .related-findings table {{ width:100%; border-collapse:collapse; background:#fff; }}
+    .related-findings td, .related-findings th {{ border-bottom:1px solid var(--line); padding:8px; text-align:left; }}
     @media (max-width:900px) {{ .kpis,.toolbar,.layout,.insights,.comparison-grid {{ grid-template-columns:1fr; }} header {{ position:static; }} }}
   </style>
 </head>
@@ -3463,6 +3542,20 @@ def render_dashboard(
         </div>
       `).join('');
     }}
+    function relatedRows(f) {{
+      if (!f.related_findings || !f.related_findings.length) return '';
+      return `
+        <div class="related-findings">
+          <p><strong>Hallazgo compuesto:</strong> la severidad procede de la combinación de varias evidencias relacionadas.</p>
+          <table>
+            <thead><tr><th>Regla</th><th>Ubicación</th><th>Evidencia</th></tr></thead>
+            <tbody>
+              ${{f.related_findings.map(r => `<tr><td><code>${{esc(r.rule_id)}}</code></td><td><code>${{esc(r.file)}}:${{esc(r.line)}}</code></td><td><code>${{esc(r.evidence)}}</code></td></tr>`).join('')}}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }}
     const severityEntries = severityOrder.map(s => [s, data.counts[s] || 0]);
     document.getElementById('severity-chart').innerHTML = barRows(severityEntries, Math.max(...severityEntries.map(([,v]) => v), 1), true);
     const categoryEntries = Object.entries(data.categories).sort((a,b) => b[1] - a[1]).slice(0, 6);
@@ -3498,6 +3591,7 @@ def render_dashboard(
               <p><code>${{esc(f.file)}}:${{esc(f.line)}}</code> · CVSS ${{esc(f.cvss)}} · ${{esc(f.category)}} · fingerprint <code>${{esc(f.fingerprint)}}</code></p>
             </div>
           </div>
+          ${{relatedRows(f)}}
           <pre>${{esc(f.context)}}</pre>
           ${{data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`] ? `<p><strong>Ollama:</strong> ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].verdict)}} · ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].confidence)}}. ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].rationale)}}</p>` : ''}}
           <p><strong>Riesgo:</strong> ${{esc(f.why_dangerous)}}</p>
@@ -3621,6 +3715,14 @@ def write_pdf_report(
     for finding in findings:
         story.append(p(f"{finding.rule_id} · {finding.title}", "Heading2"))
         story.append(p(f"Severidad: {finding.severity} · CVSS: {finding.cvss} · Categoria: {finding.category} · Ubicacion: {finding.file}:{finding.line}"))
+        if finding.related_findings:
+            story.append(p("Hallazgo compuesto: la severidad procede de la combinacion de varias evidencias relacionadas."))
+            for item in finding.related_findings:
+                story.append(
+                    p(
+                        f"- {item['rule_id']} en {item['file']}:{item['line']} · {item['evidence']}"
+                    )
+                )
         assessment = (ollama_assessments or {}).get(finding_key(finding))
         if assessment:
             story.append(
