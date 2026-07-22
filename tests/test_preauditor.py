@@ -1,6 +1,10 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from http.server import ThreadingHTTPServer
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 import preauditor
 import preauditor_ui
@@ -193,7 +197,7 @@ rules:
 """
         rules = preauditor_ui.validate_custom_rules_text(rule_text)
         self.assertEqual([rule.rule_id for rule in rules], ["CLIENT-999"])
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=preauditor_ui.APP_ROOT) as tmp:
             rules_file = Path(tmp) / "client-rules.yml"
             saved = preauditor_ui.save_custom_rules_text(str(rules_file), rule_text)
             loaded = preauditor_ui.load_custom_rules_text(str(rules_file))
@@ -245,6 +249,7 @@ rules:
                     "stack": "generic",
                     "client": "Demo",
                     "auto_compare": "1",
+                    "allow_external_write": "1",
                 }
             )
             self.assertIsNone(first["comparison"])
@@ -257,6 +262,7 @@ rules:
                     "stack": "generic",
                     "client": "Demo",
                     "auto_compare": "1",
+                    "allow_external_write": "1",
                 }
             )
         self.assertIsNotNone(second["comparison"])
@@ -298,6 +304,7 @@ rules:
                     "profile": "basic",
                     "stack": "generic",
                     "client": "Demo",
+                    "allow_external_write": "1",
                 }
             )
             finding = first["findings"][0]
@@ -322,11 +329,56 @@ rules:
                     "profile": "basic",
                     "stack": "generic",
                     "client": "Demo",
+                    "allow_external_write": "1",
                 }
             )
         self.assertEqual(saved["record"]["status"], "confirmed")
         self.assertEqual(second["findings"][0]["review"]["status"], "confirmed")
         self.assertEqual(second["review_counts"]["confirmed"], 1)
+
+    def test_ui_rejects_post_without_session_token(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), preauditor_ui.Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/custom-rules/validate"
+            request = urlrequest.Request(
+                url,
+                data=b'{"text":"rules: []"}',
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with self.assertRaises(urlerror.HTTPError) as raised:
+                urlrequest.urlopen(request, timeout=5)
+            self.assertEqual(raised.exception.code, 403)
+            raised.exception.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_ui_accepts_post_with_session_token(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), preauditor_ui.Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/custom-rules/validate"
+            body = b'{"text":"rules:\\n  - id: TEAM-1\\n    title: Demo\\n    severity: Baja\\n    regex: demo\\n"}'
+            request = urlrequest.Request(
+                url,
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Preauditor-Token": preauditor_ui.SESSION_TOKEN,
+                },
+                method="POST",
+            )
+            with urlrequest.urlopen(request, timeout=5) as response:
+                payload = preauditor.json.loads(response.read().decode("utf-8"))
+            self.assertEqual(payload["count"], 1)
+            self.assertEqual(payload["rules"], ["TEAM-1"])
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":

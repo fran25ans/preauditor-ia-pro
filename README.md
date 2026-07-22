@@ -116,6 +116,24 @@ Si quieres que intente abrir el navegador automaticamente:
 preauditor-ui --open
 ```
 
+### Modelo de seguridad de la UI local
+
+La interfaz web esta pensada para uso local del equipo, no como servicio publico ni SaaS.
+
+Controles aplicados:
+
+- escucha en `127.0.0.1` por defecto
+- rechaza arrancar fuera de loopback salvo `--allow-remote`
+- token aleatorio por sesion para operaciones `POST`
+- validacion de `Host` y `Origin`
+- peticiones `POST` solo con `Content-Type: application/json`
+- limite de tamano para peticiones
+- cabeceras `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Cache-Control` y `X-Frame-Options`
+- los artefactos se sirven solo desde carpetas de entrega generadas por la herramienta
+- las escrituras fuera de la carpeta de trabajo requieren confirmacion explicita en la UI
+
+No abras la UI en `0.0.0.0` ni la expongas a redes compartidas salvo que entiendas el riesgo y controles el entorno.
+
 ### Ejecución en terminal / interfaz local
 
 ![Ejecución local de Pre-Auditor IA Pro](docs/assets/terminalweb.png)

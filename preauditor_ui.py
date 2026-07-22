@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import secrets
 import tempfile
 import threading
 import webbrowser
@@ -18,10 +19,39 @@ import preauditor
 
 
 APP_ROOT = Path.cwd().resolve()
+SESSION_TOKEN = secrets.token_urlsafe(32)
+MAX_POST_BYTES = 1024 * 1024
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+GENERATED_ARTIFACT_ROOTS = {(APP_ROOT / "deliverables").resolve()}
 
 
 def utc_timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def header_hostname(value: str) -> str:
+    value = value.strip().lower()
+    if value.startswith("["):
+        return value.split("]", 1)[0] + "]"
+    return value.split(":", 1)[0]
+
+
+def is_loopback_bind(host: str) -> bool:
+    return host.lower() in {"127.0.0.1", "localhost", "::1", "[::1]"}
+
+
+def is_within(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def assert_write_allowed(path: Path, allow_external: bool = False) -> None:
+    if allow_external:
+        return
+    if is_within(path, APP_ROOT):
+        return
+    if any(is_within(path, root) for root in GENERATED_ARTIFACT_ROOTS):
+        return
+    raise ValueError("Escritura fuera de la carpeta de trabajo no permitida sin confirmacion explicita.")
 
 
 def page_shell(content: str) -> bytes:
@@ -207,6 +237,7 @@ def render_home() -> bytes:
         <label class="check"><input type="checkbox" name="auto_compare" value="1" checked> Comparar con baseline anterior de la carpeta de salida</label>
         <label>Baseline anterior opcional</label>
         <input name="compare_baseline" placeholder="/ruta/a/baseline.json">
+        <label class="check"><input type="checkbox" name="allow_external_write" value="1"> Permitir escrituras fuera de la carpeta de trabajo</label>
         <label class="check"><input type="checkbox" name="ollama" value="1"> Triage local con Ollama</label>
         <label>Modelo Ollama</label>
         <input name="ollama_model" value="llama3.1">
@@ -349,6 +380,13 @@ const customRulesTemplate = `rules:
 function escapeHtml(value) {{
   return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
 }}
+const uiToken = {json.dumps(SESSION_TOKEN)};
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (url, options = {{}}) => {{
+  const headers = new Headers(options.headers || {{}});
+  headers.set('X-Preauditor-Token', uiToken);
+  return nativeFetch(url, {{ ...options, headers }});
+}};
 const reviewLabels = {{
   pending: 'Pendiente',
   confirmed: 'Confirmado',
@@ -524,7 +562,7 @@ document.getElementById('custom-save').addEventListener('click', async () => {{
     const response = await fetch('/custom-rules/save', {{
       method: 'POST',
       headers: {{ 'Content-Type': 'application/json' }},
-      body: JSON.stringify({{ path: customRulesPath.value, text: customRulesText.value }})
+      body: JSON.stringify({{ path: customRulesPath.value, text: customRulesText.value, allow_external_write: form.elements.allow_external_write.checked ? '1' : '' }})
     }});
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'No se pudo guardar');
@@ -660,8 +698,7 @@ form.addEventListener('submit', async (event) => {{
 
 def safe_artifact(path_value: str) -> Path | None:
     path = Path(unquote(path_value)).expanduser().resolve()
-    allowed_roots = [APP_ROOT, Path("/private/tmp").resolve()]
-    if any(path == root or root in path.parents for root in allowed_roots):
+    if any(path == root or root in path.parents for root in GENERATED_ARTIFACT_ROOTS):
         return path if path.exists() and path.is_file() else None
     return None
 
@@ -733,9 +770,10 @@ def load_custom_rules_text(path_value: str) -> dict:
     return {"path": str(path), "text": path.read_text(encoding="utf-8", errors="replace")}
 
 
-def save_custom_rules_text(path_value: str, text: str) -> dict:
+def save_custom_rules_text(path_value: str, text: str, allow_external_write: bool = False) -> dict:
     rules = validate_custom_rules_text(text)
     path = resolve_custom_rules_path(path_value)
+    assert_write_allowed(path, allow_external_write)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
     return {"path": str(path), "count": len(rules), "rules": [rule.rule_id for rule in rules]}
@@ -745,6 +783,8 @@ def save_review_decision(payload: dict) -> dict:
     review_path = Path(payload.get("review_path", "")).expanduser().resolve()
     if review_path.suffix.lower() != ".json":
         raise ValueError("La validacion humana debe guardarse en un archivo JSON.")
+    if not any(is_within(review_path, root) for root in GENERATED_ARTIFACT_ROOTS):
+        raise ValueError("review.json solo puede guardarse en carpetas generadas por la herramienta en esta sesion.")
     review_path.parent.mkdir(parents=True, exist_ok=True)
     records = preauditor.load_review_records(review_path)
     fingerprint = str(payload.get("fingerprint", "")).strip()
@@ -788,7 +828,9 @@ def scan_project(payload: dict) -> dict:
         raise ValueError(f"Ruta invalida: {target}")
 
     output_dir = Path(payload.get("output_dir", "")).expanduser().resolve()
+    assert_write_allowed(output_dir, bool(payload.get("allow_external_write")))
     output_dir.mkdir(parents=True, exist_ok=True)
+    GENERATED_ARTIFACT_ROOTS.add(output_dir)
     profile = payload.get("profile", "pro")
     stack = payload.get("stack", "generic")
     if profile not in preauditor.PROFILES:
@@ -929,8 +971,40 @@ def scan_project(payload: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    def end_headers(self) -> None:
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Frame-Options", "DENY")
+        super().end_headers()
+
+    def validate_host(self) -> bool:
+        host = header_hostname(self.headers.get("Host", ""))
+        return host in LOOPBACK_HOSTS
+
+    def validate_origin(self) -> bool:
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        parsed = urlparse(origin)
+        return (parsed.hostname or "").lower() in {"127.0.0.1", "localhost", "::1"} and parsed.port in {None, self.server.server_port}
+
+    def send_json(self, status: int, payload: dict) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
+        if not self.validate_host():
+            self.send_error(400, "Host no permitido")
+            return
         parsed = urlparse(self.path)
+        if parsed.path in {"/browse", "/custom-rules"} and self.headers.get("X-Preauditor-Token") != SESSION_TOKEN:
+            self.send_json(403, {"error": "Token de sesion invalido"})
+            return
         if parsed.path == "/":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -990,11 +1064,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self) -> None:
+        if not self.validate_host():
+            self.send_json(400, {"error": "Host no permitido"})
+            return
+        if not self.validate_origin():
+            self.send_json(403, {"error": "Origin no permitido"})
+            return
+        if self.headers.get("X-Preauditor-Token") != SESSION_TOKEN:
+            self.send_json(403, {"error": "Token de sesion invalido"})
+            return
+        content_type = self.headers.get("Content-Type", "")
+        if not content_type.lower().startswith("application/json"):
+            self.send_json(415, {"error": "Content-Type debe ser application/json"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self.send_json(400, {"error": "Content-Length invalido"})
+            return
+        if length > MAX_POST_BYTES:
+            self.send_json(413, {"error": "Peticion demasiado grande"})
+            return
         if self.path not in {"/scan", "/custom-rules/validate", "/custom-rules/save", "/review"}:
             self.send_error(404)
             return
         try:
-            length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if self.path == "/scan":
                 response = scan_project(payload)
@@ -1002,7 +1096,7 @@ class Handler(BaseHTTPRequestHandler):
                 rules = validate_custom_rules_text(payload.get("text", ""))
                 response = {"count": len(rules), "rules": [rule.rule_id for rule in rules]}
             elif self.path == "/custom-rules/save":
-                response = save_custom_rules_text(payload.get("path", ""), payload.get("text", ""))
+                response = save_custom_rules_text(payload.get("path", ""), payload.get("text", ""), bool(payload.get("allow_external_write")))
             else:
                 response = save_review_decision(payload)
             body = json.dumps(response, ensure_ascii=False).encode("utf-8")
@@ -1026,11 +1120,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--open", action="store_true", help="Abrir automaticamente en el navegador.")
+    parser.add_argument("--allow-remote", action="store_true", help="Permite escuchar fuera de loopback. Uso no recomendado.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if not args.allow_remote and not is_loopback_bind(args.host):
+        print("Por seguridad, la UI solo escucha en loopback. Usa --allow-remote si entiendes el riesgo.")
+        return 2
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
     print(f"Pre-Auditor IA Pro UI: {url}")
