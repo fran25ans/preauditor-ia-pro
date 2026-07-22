@@ -104,6 +104,7 @@ Desde esa pantalla puedes:
 - indicar la ruta del proyecto
 - seleccionar perfil y stack
 - rellenar cliente, auditor, alcance y versión
+- elegir idioma de informes: español o inglés
 - comparar contra un `baseline.json` anterior para ver antes/después
 - marcar validación humana persistente en `review.json`
 - activar triage local con Ollama si lo tienes arrancado
@@ -225,6 +226,23 @@ La CLI devuelve código `1` si encuentra hallazgos críticos o altos por defecto
 python3 preauditor.py ./mi-app --fail-on Critica
 python3 preauditor.py ./mi-app --fail-on never
 ```
+
+### Informes en inglés
+
+Puedes generar los entregables principales en inglés:
+
+```bash
+preauditor ./mi-app \
+  --profile pro \
+  --language en \
+  --out report.md \
+  --html report.html \
+  --pdf executive-summary.pdf \
+  --dashboard dashboard.html \
+  --json findings.json
+```
+
+La opción también está disponible en la UI local en el campo `Idioma de informes`. Al seleccionar `English`, el Markdown, HTML, PDF, dashboard, checklist, JSON y baseline conservan el idioma elegido en sus metadatos.
 
 ## Perfiles
 

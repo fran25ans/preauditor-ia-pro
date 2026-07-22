@@ -137,6 +137,32 @@ class PreauditorRuleTests(unittest.TestCase):
         self.assertIn("**Auditor:** Auditor Test", report)
         self.assertIn("SEC-001", report)
 
+    def test_english_language_renders_reports(self):
+        findings = self.scan_fixture(
+            {
+                "app.py": 'API_KEY = "demo_api_key_not_real_1234567890"\n',
+            },
+            profile="basic",
+        )
+        meta = preauditor.ReportMeta(
+            client="Demo",
+            auditor="Auditor",
+            scope="Initial review",
+            version="test",
+            language="en",
+        )
+        markdown = preauditor.render_markdown(findings, Path("/tmp/project"), "basic", meta)
+        html_report = preauditor.render_html(findings, Path("/tmp/project"), "basic", meta)
+        dashboard = preauditor.render_dashboard(findings, Path("/tmp/project"), "basic", meta)
+        with tempfile.TemporaryDirectory() as tmp:
+            checklist = Path(tmp) / "checklist.md"
+            preauditor.write_checklist(findings, checklist, "en")
+            checklist_text = checklist.read_text(encoding="utf-8")
+        self.assertIn("Preliminary Security Assessment Report", markdown)
+        self.assertIn("Executive Summary", html_report)
+        self.assertIn("Distribution by Severity", dashboard)
+        self.assertIn("Remediation Checklist", checklist_text)
+
     def test_parse_ollama_json_with_extra_text(self):
         parsed = preauditor.parse_ollama_json(
             'Respuesta:\n{"verdict":"probable_real","confidence":"Media","rationale":"coincide","auditor_validation":"validar contexto"}'

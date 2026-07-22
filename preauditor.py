@@ -43,6 +43,47 @@ REVIEW_STATUSES = {
     "revalidated": "Revalidado",
 }
 
+REVIEW_STATUS_LABELS_EN = {
+    "pending": "Pending",
+    "confirmed": "Manually confirmed",
+    "false_positive": "False positive",
+    "accepted_risk": "Accepted risk",
+    "fixed": "Fixed",
+    "revalidated": "Revalidated",
+}
+
+SEVERITY_LABELS_EN = {
+    "Critica": "Critical",
+    "Alta": "High",
+    "Media": "Medium",
+    "Baja": "Low",
+}
+
+RISK_LABELS_EN = {
+    "Alto": "High",
+    "Medio": "Medium",
+    "Bajo": "Low",
+    "Sin hallazgos automáticos relevantes": "No relevant automated findings",
+}
+
+COMPARISON_STATUS_EN = {
+    "mejora": "improved",
+    "regresion": "regression",
+    "estable": "stable",
+}
+
+LEVEL_LABELS_EN = {
+    "Crítico": "Critical",
+    "Alto": "High",
+    "Medio": "Medium",
+    "Bajo": "Low",
+}
+
+LANGUAGES = {
+    "es": "Español",
+    "en": "English",
+}
+
 PROFILES = {
     "basic": {
         "SEC-001",
@@ -166,6 +207,7 @@ class ReportMeta:
     scope: str
     version: str
     stack: str = "generic"
+    language: str = "es"
 
 
 @dataclass(frozen=True)
@@ -233,6 +275,48 @@ def yaml_scalar(value: object) -> str:
     if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
         text = text[1:-1]
     return text
+
+
+def report_language(meta: ReportMeta | None = None, language: str | None = None) -> str:
+    value = language or (meta.language if meta else "es")
+    return "en" if value == "en" else "es"
+
+
+def severity_label(severity: str, lang: str = "es") -> str:
+    if lang == "en":
+        return SEVERITY_LABELS_EN.get(severity, severity)
+    return "Crítica" if severity == "Critica" else severity
+
+
+def review_status_label(status: str, lang: str = "es") -> str:
+    if lang == "en":
+        return REVIEW_STATUS_LABELS_EN.get(status, status)
+    return REVIEW_STATUSES.get(status, status)
+
+
+def risk_label(risk: str, lang: str = "es") -> str:
+    if lang == "en":
+        return RISK_LABELS_EN.get(risk, risk)
+    return risk
+
+
+def comparison_status_label(status: str, lang: str = "es") -> str:
+    if lang == "en":
+        return COMPARISON_STATUS_EN.get(status, status)
+    return status
+
+
+def level_label(level: str, lang: str = "es") -> str:
+    if lang == "en":
+        return LEVEL_LABELS_EN.get(level, level)
+    return level
+
+
+def stack_label(stack: str, lang: str = "es") -> str:
+    label = STACKS.get(stack, stack)
+    if lang == "en" and label == "Stack generico":
+        return "Generic stack"
+    return label
 
 
 def parse_inline_list(value: str) -> list[str]:
@@ -2771,6 +2855,23 @@ def related_findings_markdown(finding: Finding) -> list[str]:
     return lines
 
 
+def related_findings_markdown_en(finding: Finding) -> list[str]:
+    if not finding.related_findings:
+        return []
+    lines = [
+        "**Composite finding:** severity comes from the combination of related evidence.",
+        "",
+        "| Rule | Location | Evidence |",
+        "|---|---|---|",
+    ]
+    for item in finding.related_findings:
+        lines.append(
+            f"| `{item['rule_id']}` | `{item['file']}:{item['line']}` | `{item['evidence']}` |"
+        )
+    lines.append("")
+    return lines
+
+
 def related_findings_html(finding: Finding) -> str:
     if not finding.related_findings:
         return ""
@@ -2789,6 +2890,30 @@ def related_findings_html(finding: Finding) -> str:
           <p><strong>Hallazgo compuesto:</strong> la severidad procede de la combinación de varias evidencias relacionadas.</p>
           <table>
             <thead><tr><th>Regla</th><th>Ubicación</th><th>Evidencia</th></tr></thead>
+            <tbody>{rows}</tbody>
+          </table>
+        </div>
+"""
+
+
+def related_findings_html_en(finding: Finding) -> str:
+    if not finding.related_findings:
+        return ""
+    rows = "".join(
+        (
+            "<tr>"
+            f"<td><code>{html.escape(str(item['rule_id']))}</code></td>"
+            f"<td><code>{html.escape(str(item['file']))}:{html.escape(str(item['line']))}</code></td>"
+            f"<td><code>{html.escape(str(item['evidence']))}</code></td>"
+            "</tr>"
+        )
+        for item in finding.related_findings
+    )
+    return f"""
+        <div class="related-findings">
+          <p><strong>Composite finding:</strong> severity comes from the combination of related evidence.</p>
+          <table>
+            <thead><tr><th>Rule</th><th>Location</th><th>Evidence</th></tr></thead>
             <tbody>{rows}</tbody>
           </table>
         </div>
@@ -2937,8 +3062,26 @@ def global_risk(findings: list[Finding]) -> str:
     return "Sin hallazgos automáticos relevantes"
 
 
-def business_impact(findings: list[Finding]) -> str:
+def business_impact(findings: list[Finding], lang: str = "es") -> str:
     categories = {finding.category for finding in findings}
+    if lang == "en":
+        impacts_en = []
+        if "Secretos" in categories:
+            impacts_en.append("possible credential compromise and access to external services")
+        if "API" in categories:
+            impacts_en.append("exposure of endpoints or data to unauthorized clients")
+        if "IA" in categories:
+            impacts_en.append("risk of prompt injection, unauthorized actions, or unsafe AI output handling")
+        if "CI/CD" in categories:
+            impacts_en.append("higher impact if pipelines or dependencies are compromised")
+        if "Privacidad" in categories:
+            impacts_en.append("possible leakage of sensitive data into logging systems")
+        if "Archivos" in categories:
+            impacts_en.append("risk of abuse in file upload workflows")
+        if not impacts_en:
+            return "No business impact was identified with the current automated rules."
+        return "; ".join(impacts_en) + "."
+
     impacts = []
     if "Secretos" in categories:
         impacts.append("posible compromiso de credenciales y acceso a servicios externos")
@@ -2976,6 +3119,220 @@ def render_markdown(
         "ya que pueden existir falsos positivos, falsos negativos y riesgos contextuales "
         "no detectables automáticamente."
     )
+    lang = report_language(meta)
+    if lang == "en":
+        disclaimer_en = (
+            "This automated assessment does not replace expert review. "
+            "Findings must be validated by a specialist because false positives, "
+            "false negatives, and contextual risks may exist."
+        )
+        lines = [
+            "# Preliminary Security Assessment Report",
+            "",
+            f"**Client:** {meta.client}",
+            f"**Auditor:** {meta.auditor}",
+            f"**Scope:** {meta.scope}",
+            f"**Report version:** {meta.version}",
+            f"**Declared stack:** {stack_label(meta.stack, lang)}",
+            f"**Scanned project:** `{target}`",
+            f"**Project SHA256:** `{project_sha or 'not calculated'}`",
+            f"**Date:** {now}",
+            f"**Profile:** {profile}",
+            f"**Active rules:** {len(rules_for_profile(profile))}",
+            f"**Overall risk:** {risk_label(global_risk(findings), lang)}",
+            f"**Approximate average CVSS:** {average_cvss(findings)}",
+            "",
+            f"> {disclaimer_en}",
+            "",
+            "## Executive Summary",
+            "",
+            f"- Critical findings: {counts['Critica']}",
+            f"- High findings: {counts['Alta']}",
+            f"- Medium findings: {counts['Media']}",
+            f"- Low findings: {counts['Baja']}",
+            f"- Approximate average CVSS: {average_cvss(findings)}",
+            f"- Business impact: {business_impact(findings, lang)}",
+            "",
+            "### Prioritization Model",
+            "",
+            "- P1: fix immediately.",
+            "- P2: fix within 7 days.",
+            "- P3: fix within 30 days.",
+            "- P4: review in the next iteration.",
+            "",
+        ]
+        ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
+        lines.extend(
+            [
+                "### AI Agent Risk Score",
+                "",
+                f"- AI agent risk: **{ai_score}/100 — {level_label(ai_level, lang)}**",
+                f"- Factors: {', '.join(ai_reasons) if ai_reasons else 'No specific AI agent risk factors were detected.'}",
+                "",
+            ]
+        )
+        if comparison:
+            lines.extend(
+                [
+                    "### Baseline Comparison",
+                    "",
+                    f"- Baseline: `{comparison['baseline']}`",
+                    f"- New findings: {comparison['new']}",
+                    f"- Fixed findings: {comparison['fixed']}",
+                    f"- Persistent findings: {comparison['persistent']}",
+                    "",
+                ]
+            )
+        if ollama_assessments:
+            verdict_counts: dict[str, int] = {}
+            for assessment in ollama_assessments.values():
+                verdict = assessment.get("verdict", "requiere_revision")
+                verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
+            model = next(iter(ollama_assessments.values())).get("model", "unknown")
+            lines.extend(
+                [
+                    "### Local Ollama Triage",
+                    "",
+                    f"- Model: {model}",
+                    f"- Likely real: {verdict_counts.get('probable_real', 0)}",
+                    f"- Needs review: {verdict_counts.get('requiere_revision', 0)}",
+                    f"- Likely false positives: {verdict_counts.get('probable_falso_positivo', 0)}",
+                    "",
+                ]
+            )
+        validation_points = manual_validation_points(findings)
+        reviews = review_counts(findings, review_records)
+        lines.extend(
+            [
+                "### Persistent Human Review",
+                "",
+                f"- Pending: {reviews['pending']}",
+                f"- Manually confirmed: {reviews['confirmed']}",
+                f"- False positives: {reviews['false_positive']}",
+                f"- Accepted risks: {reviews['accepted_risk']}",
+                f"- Fixed: {reviews['fixed']}",
+                f"- Revalidated: {reviews['revalidated']}",
+                "",
+            ]
+        )
+        if validation_points:
+            lines.extend(["### Items Requiring Manual Validation", ""])
+            for point in validation_points:
+                lines.append(f"- {point}")
+            lines.append("")
+        lines.extend(["### Distribution by Category", ""])
+        if categories:
+            for category, count in categories.items():
+                lines.append(f"- {category}: {count}")
+        else:
+            lines.append("- No affected categories.")
+        lines.extend(["", "### Files with Most Findings", ""])
+        ranked_files = top_files(findings)
+        if ranked_files:
+            for file, count in ranked_files:
+                lines.append(f"- `{file}`: {count}")
+        else:
+            lines.append("- No affected files.")
+        lines.extend(["", "### Priorities", ""])
+        priority_findings = [f for f in findings if f.severity in {"Critica", "Alta"}][:10]
+        if priority_findings:
+            for finding in priority_findings:
+                lines.append(
+                    f"- **{severity_label(finding.severity, lang)}** - {finding.title} in `{finding.file}:{finding.line}`"
+                )
+        else:
+            lines.append("- No critical or high findings were identified with the current rules.")
+        lines.extend(["", "## Technical Report", ""])
+        if not findings:
+            lines.extend(
+                [
+                    "No findings were detected with the current rule set.",
+                    "",
+                    "This does not guarantee the absence of vulnerabilities; it only means known patterns were not identified in this automated scan.",
+                ]
+            )
+            return "\n".join(lines) + "\n"
+        for index, finding in enumerate(findings, start=1):
+            review = review_for_finding(finding, review_records)
+            lines.extend(
+                [
+                    f"### {index}. {finding.title}",
+                    "",
+                    f"- **ID:** {finding.rule_id}",
+                    f"- **Severity:** {severity_label(finding.severity, lang)}",
+                    f"- **Approximate CVSS:** {finding.cvss}",
+                    f"- **Confidence:** {finding.confidence}",
+                    f"- **Impact:** {impact_for(finding)}",
+                    f"- **Likelihood:** {likelihood_for(finding)}",
+                    f"- **Priority:** {priority_for(finding)}",
+                    f"- **Remediation effort:** {finding.remediation_effort}",
+                    f"- **Suggested SLA:** {remediation_sla(finding)}",
+                    f"- **Category:** {finding.category}",
+                    f"- **File:** `{finding.file}:{finding.line}`",
+                    f"- **Fingerprint:** `{finding.fingerprint}`",
+                    f"- **Evidence:** `{finding.evidence}`",
+                    f"- **Human review:** {review_status_label(review['status'], lang)}",
+                    "",
+                ]
+            )
+            assessment = (ollama_assessments or {}).get(finding_key(finding))
+            if assessment:
+                lines.extend(
+                    [
+                        "**Ollama triage:**",
+                        "",
+                        f"- **Verdict:** {assessment.get('verdict', 'requiere_revision')}",
+                        f"- **Confidence:** {assessment.get('confidence', 'Baja')}",
+                        f"- **Rationale:** {assessment.get('rationale', '')}",
+                        f"- **Human validation:** {assessment.get('auditor_validation', '')}",
+                        "",
+                    ]
+                )
+            lines.extend(related_findings_markdown_en(finding))
+            lines.extend(
+                [
+                    "**Context:**",
+                    "",
+                    "```",
+                    finding.context,
+                    "```",
+                    "",
+                    f"**Description:** {finding.description}",
+                    "",
+                    f"**Why this is dangerous:** {finding.why_dangerous}",
+                    "",
+                    f"**Conceptual exploitation:** {finding.exploit_concept}",
+                    "",
+                    f"**How to fix:** {finding.recommendation}",
+                    "",
+                    "**Secure code example:**",
+                    "",
+                    "```",
+                    finding.secure_example,
+                    "```",
+                    "",
+                    f"**Reference:** {finding.reference}",
+                    "",
+                    "**Remediation checklist:**",
+                    "",
+                    "- [ ] Validate whether the finding applies in the real context.",
+                    "- [ ] Fix the root cause, not only the isolated evidence.",
+                    "- [ ] Add a preventive test or control.",
+                    "- [ ] Review deployments, history, and affected secrets.",
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "## Recommended Next Steps",
+                "",
+                "1. Manually validate critical and high findings.",
+                "2. Prioritize fixes based on exposure, affected data, and exploitability.",
+                "3. Run the scan again after remediation.",
+                "4. Complete an expert review for business logic, architecture, and contextual risks.",
+            ]
+        )
+        return "\n".join(lines) + "\n"
 
     lines = [
         "# Informe de análisis preliminar de seguridad",
@@ -3231,6 +3588,172 @@ def badge_class(severity: str) -> str:
     }[severity]
 
 
+def render_html_en(
+    findings: list[Finding],
+    target: Path,
+    profile: str,
+    meta: ReportMeta,
+    project_sha: str = "",
+    comparison: dict | None = None,
+    ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
+) -> str:
+    counts = severity_counts(findings)
+    categories = category_counts(findings)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    risk = risk_label(global_risk(findings), "en")
+    disclaimer = (
+        "This automated assessment does not replace expert review. Findings must be "
+        "validated by a specialist because false positives, false negatives, and contextual risks may exist."
+    )
+    category_rows = "\n".join(
+        f"<tr><td>{html.escape(category)}</td><td>{count}</td></tr>"
+        for category, count in categories.items()
+    ) or "<tr><td>No affected categories</td><td>0</td></tr>"
+    file_rows = "\n".join(
+        f"<tr><td><code>{html.escape(file)}</code></td><td>{count}</td></tr>"
+        for file, count in top_files(findings)
+    ) or "<tr><td>No affected files</td><td>0</td></tr>"
+    priority_items = "\n".join(
+        (
+            f"<li><span class='badge {badge_class(f.severity)}'>{html.escape(severity_label(f.severity, 'en'))}</span>"
+            f"<strong>{html.escape(f.title)}</strong>"
+            f"<span><code>{html.escape(f.file)}:{f.line}</code></span></li>"
+        )
+        for f in [finding for finding in findings if finding.severity in {"Critica", "Alta"}][:10]
+    ) or "<li>No critical or high findings were identified with the current rules.</li>"
+    ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
+    comparison_html = ""
+    if comparison:
+        comparison_html = f"""
+    <section class="panel">
+      <h2>Baseline Comparison</h2>
+      <p><strong>New:</strong> {comparison['new']} · <strong>Fixed:</strong> {comparison['fixed']} · <strong>Persistent:</strong> {comparison['persistent']} · <strong>Status:</strong> {html.escape(comparison_status_label(comparison['status'], 'en'))}</p>
+      <p><code>{html.escape(comparison['baseline'])}</code></p>
+    </section>
+"""
+    review_summary = review_counts(findings, review_records)
+    review_html = f"""
+    <section class="panel">
+      <h2>Persistent Human Review</h2>
+      <p><strong>Pending:</strong> {review_summary['pending']} · <strong>Confirmed:</strong> {review_summary['confirmed']} · <strong>False positives:</strong> {review_summary['false_positive']} · <strong>Accepted risks:</strong> {review_summary['accepted_risk']} · <strong>Fixed:</strong> {review_summary['fixed']} · <strong>Revalidated:</strong> {review_summary['revalidated']}</p>
+    </section>
+"""
+    ollama_html = ""
+    if ollama_assessments:
+        verdict_counts: dict[str, int] = {}
+        for assessment in ollama_assessments.values():
+            verdict = assessment.get("verdict", "requiere_revision")
+            verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
+        ollama_html = f"""
+    <section class="panel">
+      <h2>Local Ollama Triage</h2>
+      <p><strong>Likely real:</strong> {verdict_counts.get('probable_real', 0)} · <strong>Needs review:</strong> {verdict_counts.get('requiere_revision', 0)} · <strong>Likely false positives:</strong> {verdict_counts.get('probable_falso_positivo', 0)}</p>
+    </section>
+"""
+    manual_html = "".join(f"<li>{html.escape(point)}</li>" for point in manual_validation_points(findings))
+    finding_cards = []
+    for index, finding in enumerate(findings, start=1):
+        assessment = (ollama_assessments or {}).get(finding_key(finding))
+        review = review_for_finding(finding, review_records)
+        finding_cards.append(
+            f"""
+      <article class="finding{' composite' if finding.rule_id.startswith('CMP-') else ''}">
+        <div class="finding-head">
+          <div>
+            <p class="eyebrow">{html.escape(finding.rule_id)} · {html.escape(finding.category)}</p>
+            <h3>{index}. {html.escape(finding.title)}</h3>
+            <p><code>{html.escape(finding.file)}:{finding.line}</code> · fingerprint <code>{html.escape(finding.fingerprint)}</code></p>
+          </div>
+          <div class="scorebox">
+            <span class="badge {badge_class(finding.severity)}">{html.escape(severity_label(finding.severity, 'en'))}</span>
+            <strong>{finding.cvss}</strong>
+            <span>Approx. CVSS</span>
+          </div>
+        </div>
+        <div class="meta-grid">
+          <div><span>Confidence</span><strong>{html.escape(finding.confidence)}</strong></div>
+          <div><span>Effort</span><strong>{html.escape(finding.remediation_effort)}</strong></div>
+          <div><span>Suggested SLA</span><strong>{html.escape(remediation_sla(finding))}</strong></div>
+          <div><span>Human review</span><strong>{html.escape(review_status_label(review['status'], 'en'))}</strong></div>
+        </div>
+        {related_findings_html_en(finding)}
+        <pre>{html.escape(finding.context)}</pre>
+        {f"<div class='meta-grid'><div><span>Ollama</span><strong>{html.escape(assessment.get('verdict', 'requiere_revision'))}</strong></div><div><span>AI confidence</span><strong>{html.escape(assessment.get('confidence', 'Baja'))}</strong></div><div><span>Validation</span><strong>{html.escape(assessment.get('auditor_validation', 'Manual review required'))}</strong></div></div><p>{html.escape(assessment.get('rationale', ''))}</p>" if assessment else ""}
+        <dl>
+          <dt>Description</dt><dd>{html.escape(finding.description)}</dd>
+          <dt>Why this is dangerous</dt><dd>{html.escape(finding.why_dangerous)}</dd>
+          <dt>Conceptual exploitation</dt><dd>{html.escape(finding.exploit_concept)}</dd>
+          <dt>Recommended fix</dt><dd>{html.escape(finding.recommendation)}</dd>
+          <dt>Secure example</dt><dd><code>{html.escape(finding.secure_example)}</code></dd>
+          <dt>Reference</dt><dd>{html.escape(finding.reference)}</dd>
+        </dl>
+      </article>
+"""
+        )
+    findings_html = "\n".join(finding_cards) or "<p>No findings were detected with the current rule set.</p>"
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preliminary Security Assessment</title>
+  <style>
+    :root {{ --ink:#18212f; --muted:#5b6472; --line:#d8dee8; --panel:#f7f9fc; --critical:#a31925; --high:#c2410c; --medium:#9a6700; --low:#176f4d; --brand:#0f766e; }}
+    * {{ box-sizing:border-box; }} body {{ margin:0; font-family:Arial,sans-serif; line-height:1.55; color:var(--ink); background:#fff; }} main {{ max-width:1120px; margin:0 auto; padding:36px 28px 56px; }}
+    header {{ border-bottom:1px solid var(--line); padding-bottom:24px; margin-bottom:28px; }} h1 {{ margin:0 0 10px; font-size:34px; line-height:1.1; }} h2 {{ margin:34px 0 14px; font-size:22px; }} h3 {{ margin:0; font-size:18px; }}
+    p {{ margin:0 0 10px; }} code {{ background:#eef2f7; padding:2px 5px; border-radius:4px; }} pre {{ margin:16px 0; background:#101828; color:#f8fafc; padding:14px; border-radius:8px; overflow-x:auto; font-size:13px; }}
+    table {{ width:100%; border-collapse:collapse; background:#fff; }} td,th {{ border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; }} .subtitle {{ color:var(--muted); max-width:780px; }}
+    .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin-top:24px; }} .kpi,.panel,.finding {{ border:1px solid var(--line); border-radius:8px; }} .kpi {{ padding:14px; background:var(--panel); }} .kpi span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }} .kpi strong {{ display:block; margin-top:6px; font-size:24px; }}
+    .notice {{ border-left:4px solid var(--brand); background:#eefdf9; padding:14px 16px; border-radius:6px; margin:22px 0; }} .grid {{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }} .panel {{ padding:16px; background:#fff; }}
+    .priority {{ list-style:none; padding:0; margin:0; }} .priority li {{ display:grid; grid-template-columns:86px 1fr auto; gap:12px; align-items:center; border-bottom:1px solid var(--line); padding:10px 0; }}
+    .badge {{ display:inline-block; border-radius:999px; padding:4px 9px; color:#fff; font-size:12px; font-weight:700; text-align:center; }} .critical {{ background:var(--critical); }} .high {{ background:var(--high); }} .medium {{ background:var(--medium); }} .low {{ background:var(--low); }}
+    .finding {{ padding:18px; margin:18px 0; page-break-inside:avoid; }} .finding.composite {{ border-color:var(--critical); box-shadow:0 0 0 2px rgba(163,25,37,.12), 0 0 24px rgba(163,25,37,.18); }} .finding-head {{ display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }}
+    .eyebrow {{ color:var(--brand); font-size:12px; font-weight:700; text-transform:uppercase; margin-bottom:4px; }} .scorebox {{ min-width:120px; text-align:right; }} .scorebox strong {{ display:block; font-size:28px; margin-top:8px; }} .scorebox span:last-child {{ color:var(--muted); font-size:12px; }}
+    .meta-grid {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:16px; }} .meta-grid div {{ background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px; }} .meta-grid span {{ display:block; color:var(--muted); font-size:12px; }}
+    .related-findings {{ border:1px solid #f2b8bd; background:#fff7f8; border-radius:8px; padding:12px; margin-top:16px; }} dl {{ display:grid; grid-template-columns:210px 1fr; gap:8px 18px; }} dt {{ font-weight:700; color:#263244; }} dd {{ margin:0; }}
+    @media(max-width:820px) {{ .kpis,.grid,.meta-grid {{ grid-template-columns:1fr; }} .priority li {{ grid-template-columns:1fr; }} .finding-head {{ display:block; }} .scorebox {{ text-align:left; margin-top:12px; }} dl {{ grid-template-columns:1fr; }} }}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Pre-Auditor IA · local preliminary assessment</p>
+      <h1>Preliminary Security Assessment Report</h1>
+      <p class="subtitle">Local automated scan designed to detect risk patterns, prioritize evidence, and prepare expert validation.</p>
+      <div class="kpis">
+        <div class="kpi"><span>Overall risk</span><strong>{html.escape(risk)}</strong></div>
+        <div class="kpi"><span>Critical</span><strong>{counts['Critica']}</strong></div>
+        <div class="kpi"><span>High</span><strong>{counts['Alta']}</strong></div>
+        <div class="kpi"><span>Total</span><strong>{len(findings)}</strong></div>
+        <div class="kpi"><span>Avg. CVSS</span><strong>{average_cvss(findings)}</strong></div>
+      </div>
+    </header>
+    <section class="notice">{html.escape(disclaimer)}</section>
+    <section>
+      <h2>Executive Summary</h2>
+      <p><strong>Client:</strong> {html.escape(meta.client)} · <strong>Auditor:</strong> {html.escape(meta.auditor)}</p>
+      <p><strong>Scope:</strong> {html.escape(meta.scope)} · <strong>Version:</strong> {html.escape(meta.version)} · <strong>Stack:</strong> {html.escape(stack_label(meta.stack, 'en'))}</p>
+      <p><strong>Project:</strong> <code>{html.escape(str(target))}</code></p>
+      <p><strong>Project SHA256:</strong> <code>{html.escape(project_sha or 'not calculated')}</code></p>
+      <p><strong>Date:</strong> {html.escape(now)} · <strong>Profile:</strong> {html.escape(profile)} · <strong>Active rules:</strong> {len(rules_for_profile(profile))}</p>
+      <p><strong>Business impact:</strong> {html.escape(business_impact(findings, 'en'))}</p>
+    </section>
+    <section class="panel"><h2>AI Agent Risk Score</h2><p><strong>{ai_score}/100 — {html.escape(level_label(ai_level, 'en'))}</strong></p><p>{html.escape(', '.join(ai_reasons) if ai_reasons else 'No specific AI agent risk factors were detected.')}</p></section>
+    {comparison_html}
+    {ollama_html}
+    {review_html}
+    <section class="panel"><h2>Items Requiring Manual Validation</h2><ul>{manual_html or '<li>Manually validate critical and high findings.</li>'}</ul></section>
+    <section class="grid"><div class="panel"><h2>Distribution by Category</h2><table>{category_rows}</table></div><div class="panel"><h2>Files with Most Findings</h2><table>{file_rows}</table></div></section>
+    <section><h2>Priorities</h2><ul class="priority">{priority_items}</ul></section>
+    <section><h2>Technical Report</h2>{findings_html}</section>
+    <section><h2>Recommended Next Steps</h2><ol><li>Manually validate critical and high findings.</li><li>Confirm real exploitability, exposure, and affected data.</li><li>Fix root causes and add preventive controls.</li><li>Run the scan again and close evidence through expert review.</li></ol></section>
+  </main>
+</body>
+</html>
+"""
+
+
 def render_html(
     findings: list[Finding],
     target: Path,
@@ -3241,6 +3764,9 @@ def render_html(
     ollama_assessments: dict[str, dict] | None = None,
     review_records: dict[str, dict] | None = None,
 ) -> str:
+    if report_language(meta) == "en":
+        return render_html_en(findings, target, profile, meta, project_sha, comparison, ollama_assessments, review_records)
+
     counts = severity_counts(findings)
     categories = category_counts(findings)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -3498,17 +4024,55 @@ def render_dashboard(
     ollama_assessments: dict[str, dict] | None = None,
     review_records: dict[str, dict] | None = None,
 ) -> str:
+    lang = report_language(meta)
+    dashboard_text = {
+        "html_lang": "en" if lang == "en" else "es",
+        "risk": "Risk" if lang == "en" else "Riesgo",
+        "critical": "Critical" if lang == "en" else "Críticos",
+        "high": "High" if lang == "en" else "Altos",
+        "total": "Total",
+        "severity_distribution": "Distribution by Severity" if lang == "en" else "Distribución por severidad",
+        "composite_findings": "Composite Findings" if lang == "en" else "Hallazgos compuestos",
+        "top_categories": "Top Categories" if lang == "en" else "Categorías principales",
+        "risky_files": "Files with Most Risk" if lang == "en" else "Archivos con más riesgo",
+        "search_placeholder": "Search by file, rule, description..." if lang == "en" else "Buscar por archivo, regla, descripción...",
+        "all_severities": "All severities" if lang == "en" else "Todas las severidades",
+        "all_categories": "All categories" if lang == "en" else "Todas las categorías",
+        "clear": "Clear" if lang == "en" else "Limpiar",
+        "categories": "Categories" if lang == "en" else "Categorías",
+        "before_after": "Before/after comparison" if lang == "en" else "Comparativa antes/después",
+        "before": "Before" if lang == "en" else "Antes",
+        "now": "Now" if lang == "en" else "Ahora",
+        "new": "New" if lang == "en" else "Nuevos",
+        "fixed": "Fixed" if lang == "en" else "Corregidos",
+        "improvement": "Improvement" if lang == "en" else "Mejora",
+        "composite_label": "Composite finding" if lang == "en" else "Hallazgo compuesto",
+        "composite_text": "severity comes from the combination of related evidence." if lang == "en" else "la severidad procede de la combinación de varias evidencias relacionadas.",
+        "rule": "Rule" if lang == "en" else "Regla",
+        "location": "Location" if lang == "en" else "Ubicación",
+        "evidence": "Evidence" if lang == "en" else "Evidencia",
+        "no_composites": "No composite risk chains detected." if lang == "en" else "No se han detectado cadenas de riesgo compuestas.",
+        "visible_findings": "visible findings" if lang == "en" else "hallazgos visibles",
+        "human_review": "Human review" if lang == "en" else "Validación humana",
+        "risk_detail": "Risk" if lang == "en" else "Riesgo",
+        "fix": "Fix" if lang == "en" else "Corrección",
+    }
     ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
     payload = json.dumps(
         {
             "target": str(target),
             "profile": profile,
             "meta": asdict(meta),
+            "language": lang,
+            "severity_labels": SEVERITY_LABELS_EN if lang == "en" else {"Critica": "Crítica", "Alta": "Alta", "Media": "Media", "Baja": "Baja"},
+            "review_status_labels": REVIEW_STATUS_LABELS_EN if lang == "en" else REVIEW_STATUSES,
+            "risk_label": risk_label(global_risk(findings), lang),
+            "comparison_status_label": comparison_status_label(comparison["status"], lang) if comparison else None,
             "project_sha256": project_sha,
             "comparison": comparison,
             "ollama_triage": ollama_assessments or {},
             "review_counts": review_counts(findings, review_records),
-            "ai_agent_risk": {"score": ai_score, "level": ai_level, "reasons": ai_reasons},
+            "ai_agent_risk": {"score": ai_score, "level": level_label(ai_level, lang), "raw_level": ai_level, "reasons": ai_reasons},
             "risk": global_risk(findings),
             "counts": severity_counts(findings),
             "categories": category_counts(findings),
@@ -3519,7 +4083,7 @@ def render_dashboard(
     )
     safe_payload = payload.replace("</", "<\\/")
     return f"""<!doctype html>
-<html lang="es">
+<html lang="{dashboard_text['html_lang']}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -3582,10 +4146,10 @@ def render_dashboard(
       <p><strong id="client"></strong> · <span id="scope"></span></p>
       <p><code id="target"></code></p>
       <div class="kpis">
-        <div class="kpi"><span>Riesgo</span><strong id="risk"></strong></div>
-        <div class="kpi"><span>Críticos</span><strong id="crit"></strong></div>
-        <div class="kpi"><span>Altos</span><strong id="high"></strong></div>
-        <div class="kpi"><span>Total</span><strong id="total"></strong></div>
+        <div class="kpi"><span>{dashboard_text['risk']}</span><strong id="risk"></strong></div>
+        <div class="kpi"><span>{dashboard_text['critical']}</span><strong id="crit"></strong></div>
+        <div class="kpi"><span>{dashboard_text['high']}</span><strong id="high"></strong></div>
+        <div class="kpi"><span>{dashboard_text['total']}</span><strong id="total"></strong></div>
         <div class="kpi"><span>AI Agent</span><strong id="ai"></strong></div>
       </div>
     </div>
@@ -3594,31 +4158,31 @@ def render_dashboard(
     <section id="comparison-panel"></section>
     <div class="insights">
       <section class="panel">
-        <h2>Distribución por severidad</h2>
+        <h2>{dashboard_text['severity_distribution']}</h2>
         <div id="severity-chart"></div>
       </section>
       <section class="panel">
-        <h2>Hallazgos compuestos</h2>
+        <h2>{dashboard_text['composite_findings']}</h2>
         <div id="compound-list"></div>
       </section>
       <section class="panel">
-        <h2>Categorías principales</h2>
+        <h2>{dashboard_text['top_categories']}</h2>
         <div id="category-chart"></div>
       </section>
       <section class="panel">
-        <h2>Archivos con más riesgo</h2>
+        <h2>{dashboard_text['risky_files']}</h2>
         <div id="file-chart"></div>
       </section>
     </div>
     <div class="toolbar">
-      <input id="search" placeholder="Buscar por archivo, regla, descripción...">
-      <select id="severity"><option value="">Todas las severidades</option></select>
-      <select id="category"><option value="">Todas las categorías</option></select>
-      <button id="reset">Limpiar</button>
+      <input id="search" placeholder="{dashboard_text['search_placeholder']}">
+      <select id="severity"><option value="">{dashboard_text['all_severities']}</option></select>
+      <select id="category"><option value="">{dashboard_text['all_categories']}</option></select>
+      <button id="reset">{dashboard_text['clear']}</button>
     </div>
     <div class="layout">
       <aside class="panel">
-        <h2>Categorías</h2>
+        <h2>{dashboard_text['categories']}</h2>
         <div id="categories"></div>
       </aside>
       <section>
@@ -3632,11 +4196,13 @@ def render_dashboard(
     const data = JSON.parse(document.getElementById('data').textContent);
     const findings = data.findings;
     const severityOrder = ['Critica','Alta','Media','Baja'];
+    const severityLabel = value => data.severity_labels[value] || value;
+    const reviewStatusLabel = value => data.review_status_labels[value] || value;
     const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
     document.getElementById('client').textContent = data.meta.client;
     document.getElementById('scope').textContent = data.meta.scope;
     document.getElementById('target').textContent = data.target;
-    document.getElementById('risk').textContent = data.risk;
+    document.getElementById('risk').textContent = data.risk_label || data.risk;
     document.getElementById('crit').textContent = data.counts.Critica;
     document.getElementById('high').textContent = data.counts.Alta;
     document.getElementById('total').textContent = findings.length;
@@ -3644,14 +4210,14 @@ def render_dashboard(
     if (data.comparison) {{
       document.getElementById('comparison-panel').innerHTML = `
         <div class="comparison-panel ${{esc(data.comparison.status)}}">
-          <h2>Comparativa antes/después · ${{esc(data.comparison.status)}}</h2>
+          <h2>{dashboard_text['before_after']} · ${{esc(data.comparison_status_label || data.comparison.status)}}</h2>
           <p><code>${{esc(data.comparison.baseline)}}</code></p>
           <div class="comparison-grid">
-            <div><span>Antes</span><strong>${{data.comparison.previous_total}}</strong></div>
-            <div><span>Ahora</span><strong>${{data.comparison.current_total}}</strong></div>
-            <div><span>Nuevos</span><strong>${{data.comparison.new}}</strong></div>
-            <div><span>Corregidos</span><strong>${{data.comparison.fixed}}</strong></div>
-            <div><span>Mejora</span><strong>${{data.comparison.improvement_percent}}%</strong></div>
+            <div><span>{dashboard_text['before']}</span><strong>${{data.comparison.previous_total}}</strong></div>
+            <div><span>{dashboard_text['now']}</span><strong>${{data.comparison.current_total}}</strong></div>
+            <div><span>{dashboard_text['new']}</span><strong>${{data.comparison.new}}</strong></div>
+            <div><span>{dashboard_text['fixed']}</span><strong>${{data.comparison.fixed}}</strong></div>
+            <div><span>{dashboard_text['improvement']}</span><strong>${{data.comparison.improvement_percent}}%</strong></div>
           </div>
         </div>
       `;
@@ -3669,9 +4235,9 @@ def render_dashboard(
       if (!f.related_findings || !f.related_findings.length) return '';
       return `
         <div class="related-findings">
-          <p><strong>Hallazgo compuesto:</strong> la severidad procede de la combinación de varias evidencias relacionadas.</p>
+          <p><strong>{dashboard_text['composite_label']}:</strong> {dashboard_text['composite_text']}</p>
           <table>
-            <thead><tr><th>Regla</th><th>Ubicación</th><th>Evidencia</th></tr></thead>
+            <thead><tr><th>{dashboard_text['rule']}</th><th>{dashboard_text['location']}</th><th>{dashboard_text['evidence']}</th></tr></thead>
             <tbody>
               ${{f.related_findings.map(r => `<tr><td><code>${{esc(r.rule_id)}}</code></td><td><code>${{esc(r.file)}}:${{esc(r.line)}}</code></td><td><code>${{esc(r.evidence)}}</code></td></tr>`).join('')}}
             </tbody>
@@ -3690,11 +4256,11 @@ def render_dashboard(
     document.getElementById('compound-list').innerHTML = compounds.length ? compounds.map(f => `
       <div class="compound-item">
         <strong>${{esc(f.rule_id)}} · ${{esc(f.title)}}</strong>
-        <p><code>${{esc(f.file)}}:${{esc(f.line)}}</code> · ${{esc(f.severity)}} · CVSS ${{esc(f.cvss)}}</p>
+        <p><code>${{esc(f.file)}}:${{esc(f.line)}}</code> · ${{esc(severityLabel(f.severity))}} · CVSS ${{esc(f.cvss)}}</p>
       </div>
-    `).join('') : '<p>No se han detectado cadenas de riesgo compuestas.</p>';
+    `).join('') : '<p>{dashboard_text['no_composites']}</p>';
     const sev = document.getElementById('severity');
-    severityOrder.forEach(s => sev.append(new Option(s, s)));
+    severityOrder.forEach(s => sev.append(new Option(severityLabel(s), s)));
     const cat = document.getElementById('category');
     Object.keys(data.categories).sort().forEach(c => cat.append(new Option(c, c)));
     document.getElementById('categories').innerHTML = Object.entries(data.categories).sort().map(([k,v]) => `<div class="category-row"><span>${{k}}</span><strong>${{v}}</strong></div>`).join('');
@@ -3703,23 +4269,23 @@ def render_dashboard(
       const s = sev.value;
       const c = cat.value;
       const filtered = findings.filter(f => (!s || f.severity === s) && (!c || f.category === c) && (!q || JSON.stringify(f).toLowerCase().includes(q)));
-      document.getElementById('result-count').textContent = `${{filtered.length}} hallazgos visibles`;
+      document.getElementById('result-count').textContent = `${{filtered.length}} {dashboard_text['visible_findings']}`;
       document.getElementById('findings').innerHTML = filtered.map(f => `
         <article class="finding ${{f.rule_id.startsWith('CMP-') ? 'composite' : ''}}">
           <div class="finding-head">
             <div>
-              <span class="badge ${{esc(f.severity)}}">${{esc(f.severity)}}</span>
-              ${{f.rule_id.startsWith('CMP-') ? '<span class="composite-tag">Hallazgo compuesto</span>' : ''}}
+              <span class="badge ${{esc(f.severity)}}">${{esc(severityLabel(f.severity))}}</span>
+              ${{f.rule_id.startsWith('CMP-') ? '<span class="composite-tag">{dashboard_text['composite_label']}</span>' : ''}}
               <h2>${{esc(f.rule_id)}} · ${{esc(f.title)}}</h2>
               <p><code>${{esc(f.file)}}:${{esc(f.line)}}</code> · CVSS ${{esc(f.cvss)}} · ${{esc(f.category)}} · fingerprint <code>${{esc(f.fingerprint)}}</code></p>
             </div>
           </div>
           ${{relatedRows(f)}}
           <pre>${{esc(f.context)}}</pre>
-          <p><strong>Validación humana:</strong> ${{esc(f.review?.status || 'pending')}} ${{f.review?.reviewed_by ? '· ' + esc(f.review.reviewed_by) : ''}}</p>
+          <p><strong>{dashboard_text['human_review']}:</strong> ${{esc(reviewStatusLabel(f.review?.status || 'pending'))}} ${{f.review?.reviewed_by ? '· ' + esc(f.review.reviewed_by) : ''}}</p>
           ${{data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`] ? `<p><strong>Ollama:</strong> ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].verdict)}} · ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].confidence)}}. ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].rationale)}}</p>` : ''}}
-          <p><strong>Riesgo:</strong> ${{esc(f.why_dangerous)}}</p>
-          <p><strong>Corrección:</strong> ${{esc(f.recommendation)}}</p>
+          <p><strong>{dashboard_text['risk_detail']}:</strong> ${{esc(f.why_dangerous)}}</p>
+          <p><strong>{dashboard_text['fix']}:</strong> ${{esc(f.recommendation)}}</p>
         </article>`).join('');
     }}
     ['search','severity','category'].forEach(id => document.getElementById(id).addEventListener('input', render));
@@ -3754,25 +4320,26 @@ def write_pdf_report(
     styles = getSampleStyleSheet()
     story = []
     counts = severity_counts(findings)
+    lang = report_language(meta)
 
     def p(text: str, style: str = "BodyText") -> Paragraph:
         return Paragraph(html.escape(str(text)).replace("\n", "<br/>"), styles[style])
 
-    story.append(p("Informe de análisis preliminar de seguridad", "Title"))
-    story.append(p(f"Cliente: {meta.client}", "Heading2"))
-    story.append(p(f"Auditor: {meta.auditor}"))
-    story.append(p(f"Alcance: {meta.scope}"))
-    story.append(p(f"Versión: {meta.version}"))
-    story.append(p(f"Stack: {STACKS.get(meta.stack, meta.stack)}"))
-    story.append(p(f"Proyecto: {target}"))
-    story.append(p(f"SHA256 proyecto: {project_sha or 'no calculado'}"))
-    story.append(p(f"Perfil: {profile} · Reglas activas: {len(rules_for_profile(profile))}"))
+    story.append(p("Preliminary Security Assessment Report" if lang == "en" else "Informe de análisis preliminar de seguridad", "Title"))
+    story.append(p(f"{'Client' if lang == 'en' else 'Cliente'}: {meta.client}", "Heading2"))
+    story.append(p(f"{'Auditor' if lang == 'en' else 'Auditor'}: {meta.auditor}"))
+    story.append(p(f"{'Scope' if lang == 'en' else 'Alcance'}: {meta.scope}"))
+    story.append(p(f"{'Version' if lang == 'en' else 'Versión'}: {meta.version}"))
+    story.append(p(f"Stack: {stack_label(meta.stack, lang)}"))
+    story.append(p(f"{'Project' if lang == 'en' else 'Proyecto'}: {target}"))
+    story.append(p(f"{'Project SHA256' if lang == 'en' else 'SHA256 proyecto'}: {project_sha or ('not calculated' if lang == 'en' else 'no calculado')}"))
+    story.append(p(f"{'Profile' if lang == 'en' else 'Perfil'}: {profile} · {'Active rules' if lang == 'en' else 'Reglas activas'}: {len(rules_for_profile(profile))}"))
     story.append(Spacer(1, 14))
 
     summary = Table(
         [
-            ["Riesgo global", "Críticos", "Altos", "Medios", "CVSS medio"],
-            [global_risk(findings), counts["Critica"], counts["Alta"], counts["Media"], average_cvss(findings)],
+            (["Overall risk", "Critical", "High", "Medium", "Avg. CVSS"] if lang == "en" else ["Riesgo global", "Críticos", "Altos", "Medios", "CVSS medio"]),
+            [risk_label(global_risk(findings), lang), counts["Critica"], counts["Alta"], counts["Media"], average_cvss(findings)],
         ],
         hAlign="LEFT",
     )
@@ -3790,24 +4357,40 @@ def write_pdf_report(
     )
     story.append(summary)
     story.append(Spacer(1, 14))
-    story.append(p("Esta auditoría automática no sustituye una revisión experta. Los hallazgos deben ser validados por un consultor especializado.", "Italic"))
+    story.append(p(
+        "This automated assessment does not replace expert review. Findings must be validated by a specialist."
+        if lang == "en"
+        else "Esta auditoría automática no sustituye una revisión experta. Los hallazgos deben ser validados por un consultor especializado.",
+        "Italic",
+    ))
     story.append(Spacer(1, 18))
     ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
     story.append(p("AI Agent Risk Score", "Heading1"))
-    story.append(p(f"{ai_score}/100 — {ai_level}"))
-    story.append(p(", ".join(ai_reasons) if ai_reasons else "No se detectaron factores específicos de agente IA."))
+    story.append(p(f"{ai_score}/100 — {level_label(ai_level, lang)}"))
+    story.append(p(", ".join(ai_reasons) if ai_reasons else ("No specific AI agent risk factors were detected." if lang == "en" else "No se detectaron factores específicos de agente IA.")))
     story.append(Spacer(1, 12))
     if comparison:
-        story.append(p("Comparativa contra baseline", "Heading1"))
-        story.append(p(f"Nuevos: {comparison['new']} · Corregidos: {comparison['fixed']} · Persistentes: {comparison['persistent']}"))
+        story.append(p("Baseline Comparison" if lang == "en" else "Comparativa contra baseline", "Heading1"))
+        if lang == "en":
+            story.append(p(f"New: {comparison['new']} · Fixed: {comparison['fixed']} · Persistent: {comparison['persistent']}"))
+        else:
+            story.append(p(f"Nuevos: {comparison['new']} · Corregidos: {comparison['fixed']} · Persistentes: {comparison['persistent']}"))
         story.append(Spacer(1, 12))
     reviews = review_counts(findings, review_records)
-    story.append(p("Validación humana persistente", "Heading1"))
+    story.append(p("Persistent Human Review" if lang == "en" else "Validación humana persistente", "Heading1"))
     story.append(
         p(
-            f"Pendientes: {reviews['pending']} · Confirmados: {reviews['confirmed']} · "
-            f"Falsos positivos: {reviews['false_positive']} · Riesgos aceptados: {reviews['accepted_risk']} · "
-            f"Corregidos: {reviews['fixed']} · Revalidados: {reviews['revalidated']}"
+            (
+                f"Pending: {reviews['pending']} · Confirmed: {reviews['confirmed']} · "
+                f"False positives: {reviews['false_positive']} · Accepted risks: {reviews['accepted_risk']} · "
+                f"Fixed: {reviews['fixed']} · Revalidated: {reviews['revalidated']}"
+            )
+            if lang == "en"
+            else (
+                f"Pendientes: {reviews['pending']} · Confirmados: {reviews['confirmed']} · "
+                f"Falsos positivos: {reviews['false_positive']} · Riesgos aceptados: {reviews['accepted_risk']} · "
+                f"Corregidos: {reviews['fixed']} · Revalidados: {reviews['revalidated']}"
+            )
         )
     )
     story.append(Spacer(1, 12))
@@ -3816,20 +4399,28 @@ def write_pdf_report(
         for assessment in ollama_assessments.values():
             verdict = assessment.get("verdict", "requiere_revision")
             verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
-        story.append(p("Triage local con Ollama", "Heading1"))
+        story.append(p("Local Ollama Triage" if lang == "en" else "Triage local con Ollama", "Heading1"))
         story.append(
             p(
-                f"Probables reales: {verdict_counts.get('probable_real', 0)} · "
-                f"Revisión: {verdict_counts.get('requiere_revision', 0)} · "
-                f"Probables falsos positivos: {verdict_counts.get('probable_falso_positivo', 0)}"
+                (
+                    f"Likely real: {verdict_counts.get('probable_real', 0)} · "
+                    f"Needs review: {verdict_counts.get('requiere_revision', 0)} · "
+                    f"Likely false positives: {verdict_counts.get('probable_falso_positivo', 0)}"
+                )
+                if lang == "en"
+                else (
+                    f"Probables reales: {verdict_counts.get('probable_real', 0)} · "
+                    f"Revisión: {verdict_counts.get('requiere_revision', 0)} · "
+                    f"Probables falsos positivos: {verdict_counts.get('probable_falso_positivo', 0)}"
+                )
             )
         )
         story.append(Spacer(1, 12))
-    story.append(p("Prioridades de validación", "Heading1"))
+    story.append(p("Validation Priorities" if lang == "en" else "Prioridades de validación", "Heading1"))
 
-    priority_rows = [["Severidad", "Hallazgo", "Ubicación", "CVSS"]]
+    priority_rows = [["Severity", "Finding", "Location", "CVSS"]] if lang == "en" else [["Severidad", "Hallazgo", "Ubicación", "CVSS"]]
     for finding in findings[:12]:
-        priority_rows.append([finding.severity, finding.title, f"{finding.file}:{finding.line}", finding.cvss])
+        priority_rows.append([severity_label(finding.severity, lang), finding.title, f"{finding.file}:{finding.line}", finding.cvss])
     priority_table = Table(priority_rows, colWidths=[58, 220, 170, 45], hAlign="LEFT")
     priority_table.setStyle(
         TableStyle(
@@ -3845,14 +4436,18 @@ def write_pdf_report(
     )
     story.append(priority_table)
     story.append(Spacer(1, 18))
-    story.append(p("Detalle técnico", "Heading1"))
+    story.append(p("Technical Detail" if lang == "en" else "Detalle técnico", "Heading1"))
 
     for finding in findings:
         story.append(p(f"{finding.rule_id} · {finding.title}", "Heading2"))
-        story.append(p(f"Severidad: {finding.severity} · CVSS: {finding.cvss} · Categoría: {finding.category} · Ubicación: {finding.file}:{finding.line}"))
-        story.append(p(f"Validación humana: {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}"))
+        if lang == "en":
+            story.append(p(f"Severity: {severity_label(finding.severity, lang)} · CVSS: {finding.cvss} · Category: {finding.category} · Location: {finding.file}:{finding.line}"))
+            story.append(p(f"Human review: {review_status_label(review_for_finding(finding, review_records)['status'], lang)}"))
+        else:
+            story.append(p(f"Severidad: {severity_label(finding.severity, lang)} · CVSS: {finding.cvss} · Categoría: {finding.category} · Ubicación: {finding.file}:{finding.line}"))
+            story.append(p(f"Validación humana: {review_status_label(review_for_finding(finding, review_records)['status'], lang)}"))
         if finding.related_findings:
-            story.append(p("Hallazgo compuesto: la severidad procede de la combinación de varias evidencias relacionadas."))
+            story.append(p("Composite finding: severity comes from the combination of related evidence." if lang == "en" else "Hallazgo compuesto: la severidad procede de la combinación de varias evidencias relacionadas."))
             for item in finding.related_findings:
                 story.append(
                     p(
@@ -3869,10 +4464,10 @@ def write_pdf_report(
                     f"{assessment.get('rationale', '')}"
                 )
             )
-        story.append(p(f"Descripción: {finding.description}"))
-        story.append(p(f"Riesgo: {finding.why_dangerous}"))
-        story.append(p(f"Corrección: {finding.recommendation}"))
-        story.append(p(f"Referencia: {finding.reference}"))
+        story.append(p(f"{'Description' if lang == 'en' else 'Descripción'}: {finding.description}"))
+        story.append(p(f"{'Risk' if lang == 'en' else 'Riesgo'}: {finding.why_dangerous}"))
+        story.append(p(f"{'Fix' if lang == 'en' else 'Corrección'}: {finding.recommendation}"))
+        story.append(p(f"{'Reference' if lang == 'en' else 'Referencia'}: {finding.reference}"))
         story.append(Spacer(1, 10))
 
     try:
@@ -3946,16 +4541,17 @@ def write_json(
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def write_checklist(findings: list[Finding], output: Path) -> None:
+def write_checklist(findings: list[Finding], output: Path, language: str = "es") -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# Checklist de remediación", ""]
+    lang = report_language(language=language)
+    lines = ["# Remediation Checklist" if lang == "en" else "# Checklist de remediación", ""]
     for finding in findings:
         lines.extend(
             [
-                f"- [ ] **{priority_for(finding)} / {finding.severity}** `{finding.rule_id}` {finding.title}",
-                f"  - Ubicación: `{finding.file}:{finding.line}`",
+                f"- [ ] **{priority_for(finding)} / {severity_label(finding.severity, lang)}** `{finding.rule_id}` {finding.title}",
+                f"  - {'Location' if lang == 'en' else 'Ubicación'}: `{finding.file}:{finding.line}`",
                 f"  - SLA: {remediation_sla(finding)}",
-                f"  - Corrección: {finding.recommendation}",
+                f"  - {'Fix' if lang == 'en' else 'Corrección'}: {finding.recommendation}",
                 "",
             ]
         )
@@ -4086,6 +4682,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ignore-file", default=None, help="Ruta opcional a un archivo de supresiones.")
     parser.add_argument("--rules-file", default=None, help="Ruta opcional a reglas custom YAML/JSON.")
     parser.add_argument("--stack", choices=sorted(STACKS), default="generic", help="Stack tecnológico declarado para contextualizar el informe.")
+    parser.add_argument("--language", choices=sorted(LANGUAGES), default="es", help="Idioma de informes y dashboard: es o en.")
     parser.add_argument("--baseline", default=None, help="Ruta para guardar un baseline JSON del escaneo actual.")
     parser.add_argument("--compare", default=None, help="Ruta a un baseline JSON previo para comparar nuevos/corregidos/persistentes.")
     parser.add_argument("--deliverable", nargs="?", const="auto", default=None, help="Genera una carpeta de entrega completa. Opcionalmente indica la ruta.")
@@ -4142,6 +4739,7 @@ def main() -> int:
         scope=args.scope,
         version=args.report_version,
         stack=args.stack,
+        language=args.language,
     )
     ignore_file = Path(args.ignore_file).expanduser().resolve() if args.ignore_file else None
     try:
@@ -4216,41 +4814,67 @@ def main() -> int:
             encoding="utf-8",
         )
     if checklist_path:
-        write_checklist(findings, checklist_path)
+        write_checklist(findings, checklist_path, meta.language)
 
     counts = severity_counts(findings)
-    print(f"Análisis preliminar completado: {len(findings)} hallazgos.")
-    print(
-        "Severidad: "
-        f"Critica={counts['Critica']} Alta={counts['Alta']} "
-        f"Media={counts['Media']} Baja={counts['Baja']}"
-    )
-    print(f"Riesgo global: {global_risk(findings)}")
-    print(f"CVSS medio aproximado: {average_cvss(findings)}")
-    print(f"AI Agent Risk Score: {ai_agent_risk_score(findings)[0]}/100 ({ai_agent_risk_score(findings)[1]})")
-    print(f"SHA256 proyecto: {project_sha}")
-    if comparison:
+    if meta.language == "en":
+        print(f"Preliminary assessment completed: {len(findings)} findings.")
         print(
-            "Comparativa: "
-            f"nuevos={comparison['new']} corregidos={comparison['fixed']} persistentes={comparison['persistent']}"
+            "Severity: "
+            f"Critical={counts['Critica']} High={counts['Alta']} "
+            f"Medium={counts['Media']} Low={counts['Baja']}"
         )
+        print(f"Overall risk: {risk_label(global_risk(findings), 'en')}")
+        print(f"Approximate average CVSS: {average_cvss(findings)}")
+        print(f"AI Agent Risk Score: {ai_agent_risk_score(findings)[0]}/100 ({level_label(ai_agent_risk_score(findings)[1], 'en')})")
+        print(f"Project SHA256: {project_sha}")
+    else:
+        print(f"Análisis preliminar completado: {len(findings)} hallazgos.")
+        print(
+            "Severidad: "
+            f"Critica={counts['Critica']} Alta={counts['Alta']} "
+            f"Media={counts['Media']} Baja={counts['Baja']}"
+        )
+        print(f"Riesgo global: {global_risk(findings)}")
+        print(f"CVSS medio aproximado: {average_cvss(findings)}")
+        print(f"AI Agent Risk Score: {ai_agent_risk_score(findings)[0]}/100 ({ai_agent_risk_score(findings)[1]})")
+        print(f"SHA256 proyecto: {project_sha}")
+    if comparison:
+        if meta.language == "en":
+            print(
+                "Comparison: "
+                f"new={comparison['new']} fixed={comparison['fixed']} persistent={comparison['persistent']}"
+            )
+        else:
+            print(
+                "Comparativa: "
+                f"nuevos={comparison['new']} corregidos={comparison['fixed']} persistentes={comparison['persistent']}"
+            )
     if args.ollama:
         verdict_counts: dict[str, int] = {}
         for assessment in ollama_assessments.values():
             verdict = assessment.get("verdict", "requiere_revision")
             verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
-        print(
-            "Ollama triage: "
-            f"probables_reales={verdict_counts.get('probable_real', 0)} "
-            f"revision={verdict_counts.get('requiere_revision', 0)} "
-            f"probables_fp={verdict_counts.get('probable_falso_positivo', 0)}"
-        )
+        if meta.language == "en":
+            print(
+                "Ollama triage: "
+                f"likely_real={verdict_counts.get('probable_real', 0)} "
+                f"needs_review={verdict_counts.get('requiere_revision', 0)} "
+                f"likely_fp={verdict_counts.get('probable_falso_positivo', 0)}"
+            )
+        else:
+            print(
+                "Ollama triage: "
+                f"probables_reales={verdict_counts.get('probable_real', 0)} "
+                f"revision={verdict_counts.get('requiere_revision', 0)} "
+                f"probables_fp={verdict_counts.get('probable_falso_positivo', 0)}"
+            )
         if args.ollama_filter_fp:
-            print("Filtro Ollama FP: activado")
-    print(f"Perfil: {args.profile}")
+            print("Ollama FP filter: enabled" if meta.language == "en" else "Filtro Ollama FP: activado")
+    print(f"{'Profile' if meta.language == 'en' else 'Perfil'}: {args.profile}")
     if custom_rules:
-        print(f"Reglas custom: {len(custom_rules)}")
-    print(f"Informe: {out_path.resolve()}")
+        print(f"{'Custom rules' if meta.language == 'en' else 'Reglas custom'}: {len(custom_rules)}")
+    print(f"{'Report' if meta.language == 'en' else 'Informe'}: {out_path.resolve()}")
     if html_path:
         print(f"HTML: {html_path.resolve()}")
     if pdf_path:

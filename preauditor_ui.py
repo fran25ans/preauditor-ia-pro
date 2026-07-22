@@ -229,6 +229,11 @@ def render_home() -> bytes:
         <input name="scope" value="Análisis preliminar local de seguridad">
         <label>Versión del informe</label>
         <input name="report_version" value="{datetime.now().strftime('%Y.%m')}">
+        <label>Idioma de informes</label>
+        <select name="language">
+          <option value="es">Español</option>
+          <option value="en">English</option>
+        </select>
       </div>
       <div class="section">
         <h3>Opciones avanzadas</h3>
@@ -477,6 +482,7 @@ document.getElementById('demo-preset').addEventListener('click', () => {{
   form.elements.stack.value = 'generic';
   form.elements.client.value = 'Demo Product Manager';
   form.elements.scope.value = 'Demo controlada sobre proyecto vulnerable de ejemplo';
+  form.elements.language.value = 'es';
   form.elements.ollama.checked = false;
 }});
 document.getElementById('clear-advanced').addEventListener('click', () => {{
@@ -623,6 +629,44 @@ form.addEventListener('submit', async (event) => {{
     }});
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Error desconocido');
+    const isEnglish = data.language === 'en';
+    const resultText = isEnglish ? {{
+      risk: 'Risk',
+      critical: 'Critical',
+      high: 'High',
+      humanReview: 'Human review',
+      pending: 'pending',
+      confirmed: 'confirmed',
+      falsePositive: 'false positives',
+      accepted: 'accepted',
+      fixed: 'fixed',
+      revalidated: 'revalidated',
+      beforeAfter: 'Before/after comparison',
+      new: 'New',
+      fixed: 'Fixed',
+      persistent: 'Persistent',
+      improvement: 'Improvement',
+      priorityFindings: 'Priority findings',
+      noFindings: 'No findings.'
+    }} : {{
+      risk: 'Riesgo',
+      critical: 'Críticos',
+      high: 'Altos',
+      humanReview: 'Validación humana',
+      pending: 'pendientes',
+      confirmed: 'confirmados',
+      falsePositive: 'falsos positivos',
+      accepted: 'aceptados',
+      fixed: 'corregidos',
+      revalidated: 'revalidados',
+      beforeAfter: 'Comparativa antes/después',
+      new: 'Nuevos',
+      fixed: 'Corregidos',
+      persistent: 'Persistentes',
+      improvement: 'Mejora',
+      priorityFindings: 'Hallazgos prioritarios',
+      noFindings: 'Sin hallazgos.'
+    }};
     const preferred = ['Dashboard', 'Informe técnico HTML', 'Resumen PDF', 'Informe técnico MD', 'Hallazgos JSON', 'SARIF', 'Baseline', 'Review', 'Checklist'];
     const links = preferred.filter(name => data.files[name]).map(name => `<a href="/artifact?path=${{encodeURIComponent(data.files[name])}}" target="_blank">${{name}}</a>`).join('');
     const warnings = (data.warnings || []).map(w => `<div class="warning">${{escapeHtml(w)}}</div>`).join('');
@@ -653,33 +697,33 @@ form.addEventListener('submit', async (event) => {{
       </div>`).join('');
     const comparison = data.comparison ? `
       <div class="comparison ${{data.comparison.status}}">
-        <p><strong>Comparativa antes/después:</strong> ${{data.comparison.status}}</p>
+        <p><strong>${{resultText.beforeAfter}}:</strong> ${{data.comparison.status}}</p>
         <p>Baseline: <code>${{escapeHtml(data.comparison.baseline)}}</code></p>
         <div class="comparison-grid">
-          <div><span>Nuevos</span><strong>${{data.comparison.new}}</strong></div>
-          <div><span>Corregidos</span><strong>${{data.comparison.fixed}}</strong></div>
-          <div><span>Persistentes</span><strong>${{data.comparison.persistent}}</strong></div>
-          <div><span>Mejora</span><strong>${{data.comparison.improvement_percent}}%</strong></div>
+          <div><span>${{resultText.new}}</span><strong>${{data.comparison.new}}</strong></div>
+          <div><span>${{resultText.fixed}}</span><strong>${{data.comparison.fixed}}</strong></div>
+          <div><span>${{resultText.persistent}}</span><strong>${{data.comparison.persistent}}</strong></div>
+          <div><span>${{resultText.improvement}}</span><strong>${{data.comparison.improvement_percent}}%</strong></div>
         </div>
       </div>
     ` : '';
     result.innerHTML = `
       <div class="kpis">
-        <div class="kpi"><span>Riesgo</span><strong>${{data.risk}}</strong></div>
-        <div class="kpi"><span>Críticos</span><strong>${{data.counts.Critica}}</strong></div>
-        <div class="kpi"><span>Altos</span><strong>${{data.counts.Alta}}</strong></div>
+        <div class="kpi"><span>${{resultText.risk}}</span><strong>${{data.risk}}</strong></div>
+        <div class="kpi"><span>${{resultText.critical}}</span><strong>${{data.counts.Critica}}</strong></div>
+        <div class="kpi"><span>${{resultText.high}}</span><strong>${{data.counts.Alta}}</strong></div>
         <div class="kpi"><span>Total</span><strong>${{data.findings.length}}</strong></div>
         <div class="kpi"><span>AI Agent</span><strong>${{data.ai.score}}/100</strong></div>
       </div>
       ${{data.ollama ? `<p><strong>Ollama:</strong> reales=${{data.ollama.probable_real}} · revisión=${{data.ollama.requiere_revision}} · falsos positivos=${{data.ollama.probable_falso_positivo}}</p>` : ''}}
       ${{data.custom_rules ? `<p><strong>Reglas custom:</strong> ${{data.custom_rules}}</p>` : ''}}
-      <p><strong>Validación humana:</strong> pendientes=${{data.review_counts.pending}} · confirmados=${{data.review_counts.confirmed}} · falsos positivos=${{data.review_counts.false_positive}} · aceptados=${{data.review_counts.accepted_risk}} · corregidos=${{data.review_counts.fixed}} · revalidados=${{data.review_counts.revalidated}}</p>
+      <p><strong>${{resultText.humanReview}}:</strong> ${{resultText.pending}}=${{data.review_counts.pending}} · ${{resultText.confirmed}}=${{data.review_counts.confirmed}} · ${{resultText.falsePositive}}=${{data.review_counts.false_positive}} · ${{resultText.accepted}}=${{data.review_counts.accepted_risk}} · ${{resultText.fixed}}=${{data.review_counts.fixed}} · ${{resultText.revalidated}}=${{data.review_counts.revalidated}}</p>
       ${{comparison}}
       ${{warnings}}
       <p><strong>SHA256 proyecto:</strong> <code>${{data.project_sha256}}</code></p>
       <div class="links">${{links}}</div>
-      <h2>Hallazgos prioritarios</h2>
-      ${{findings || '<p>Sin hallazgos.</p>'}}
+      <h2>${{resultText.priorityFindings}}</h2>
+      ${{findings || `<p>${{resultText.noFindings}}</p>`}}
     `;
     document.querySelectorAll('[data-review-status]').forEach((select, index) => {{
       const finding = data.findings[index];
@@ -844,6 +888,7 @@ def scan_project(payload: dict) -> dict:
         scope=payload.get("scope", "Análisis preliminar local de seguridad"),
         version=payload.get("report_version", "1.0"),
         stack=stack,
+        language=payload.get("language", "es") if payload.get("language", "es") in preauditor.LANGUAGES else "es",
     )
     rules_file = payload.get("rules_file", "").strip()
     custom_rules = preauditor.load_custom_rules(Path(rules_file).expanduser().resolve() if rules_file else None)
@@ -941,7 +986,7 @@ def scan_project(payload: dict) -> dict:
             ),
             encoding="utf-8",
         )
-    preauditor.write_checklist(findings, files["Checklist"])
+    preauditor.write_checklist(findings, files["Checklist"], meta.language)
     ai_score, ai_level, ai_reasons = preauditor.ai_agent_risk_score(findings)
     ollama_counts = None
     if ollama_assessments:
@@ -955,10 +1000,11 @@ def scan_project(payload: dict) -> dict:
     existing_files = {name: str(path) for name, path in files.items() if path.exists()}
 
     return {
-        "risk": preauditor.global_risk(findings),
+        "language": meta.language,
+        "risk": preauditor.risk_label(preauditor.global_risk(findings), meta.language),
         "counts": preauditor.severity_counts(findings),
         "project_sha256": project_sha,
-        "ai": {"score": ai_score, "level": ai_level, "reasons": ai_reasons},
+        "ai": {"score": ai_score, "level": preauditor.level_label(ai_level, meta.language), "raw_level": ai_level, "reasons": ai_reasons},
         "ollama": ollama_counts,
         "custom_rules": len(custom_rules),
         "comparison": comparison,
