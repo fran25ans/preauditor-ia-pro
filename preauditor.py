@@ -2758,9 +2758,9 @@ def related_findings_markdown(finding: Finding) -> list[str]:
     if not finding.related_findings:
         return []
     lines = [
-        "**Hallazgo compuesto:** la severidad procede de la combinacion de varias evidencias relacionadas.",
+        "**Hallazgo compuesto:** la severidad procede de la combinación de varias evidencias relacionadas.",
         "",
-        "| Regla | Ubicacion | Evidencia |",
+        "| Regla | Ubicación | Evidencia |",
         "|---|---|---|",
     ]
     for item in finding.related_findings:
@@ -2800,19 +2800,19 @@ def severity_at_least(severity: str, threshold: str) -> bool:
 
 
 def ollama_prompt(finding: Finding, meta: ReportMeta) -> str:
-    return f"""Eres un analista senior de AppSec ayudando a hacer triage de una pre-auditoria automatica.
+    return f"""Eres un analista senior de AppSec ayudando a hacer triage de un análisis preliminar automático.
 
 Tu tarea NO es cerrar el hallazgo. Debes estimar si parece:
 - probable_real
 - requiere_revision
 - probable_falso_positivo
 
-Responde SOLO JSON valido con estas claves:
+Responde SOLO JSON válido con estas claves:
 {{
   "verdict": "probable_real|requiere_revision|probable_falso_positivo",
   "confidence": "Alta|Media|Baja",
-  "rationale": "explicacion breve",
-  "auditor_validation": "que debe comprobar el auditor humano"
+  "rationale": "explicación breve",
+  "auditor_validation": "qué debe comprobar el auditor humano"
 }}
 
 Contexto del informe:
@@ -2821,21 +2821,21 @@ Contexto del informe:
 
 Hallazgo:
 - ID: {finding.rule_id}
-- Titulo: {finding.title}
+- Título: {finding.title}
 - Severidad: {finding.severity}
-- Categoria: {finding.category}
+- Categoría: {finding.category}
 - Archivo: {finding.file}:{finding.line}
 - Evidencia enmascarada: {finding.evidence}
 - Contexto:
 {finding.context}
-- Descripcion: {finding.description}
+- Descripción: {finding.description}
 - Riesgo: {finding.why_dangerous}
-- Recomendacion: {finding.recommendation}
+- Recomendación: {finding.recommendation}
 
 Criterios:
 - Si falta contexto para confirmar, usa requiere_revision.
-- No asumas que es falso positivo solo porque la evidencia esta incompleta.
-- Los secretos estan enmascarados intencionadamente.
+- No asumas que es falso positivo solo porque la evidencia está incompleta.
+- Los secretos están enmascarados intencionadamente.
 - Mantén la respuesta concisa."""
 
 
@@ -2853,7 +2853,7 @@ def parse_ollama_json(text: str) -> dict:
     return {
         "verdict": "requiere_revision",
         "confidence": "Baja",
-        "rationale": "Ollama no devolvio JSON valido.",
+        "rationale": "Ollama no devolvió JSON válido.",
         "auditor_validation": "Revisar manualmente el hallazgo.",
     }
 
@@ -2883,7 +2883,7 @@ def analyze_with_ollama(
             "messages": [
                 {
                     "role": "system",
-                    "content": "Eres un analista AppSec. Responde exclusivamente JSON valido.",
+                    "content": "Eres un analista AppSec. Responde exclusivamente JSON válido.",
                 },
                 {"role": "user", "content": ollama_prompt(finding, meta)},
             ],
@@ -2934,7 +2934,7 @@ def global_risk(findings: list[Finding]) -> str:
         return "Medio"
     if findings:
         return "Bajo"
-    return "Sin hallazgos automaticos relevantes"
+    return "Sin hallazgos automáticos relevantes"
 
 
 def business_impact(findings: list[Finding]) -> str:
@@ -2943,7 +2943,7 @@ def business_impact(findings: list[Finding]) -> str:
     if "Secretos" in categories:
         impacts.append("posible compromiso de credenciales y acceso a servicios externos")
     if "API" in categories:
-        impacts.append("exposicion de endpoints o datos a clientes no autorizados")
+        impacts.append("exposición de endpoints o datos a clientes no autorizados")
     if "IA" in categories:
         impacts.append("riesgo de prompt injection, acciones no autorizadas o manejo inseguro de salidas de IA")
     if "CI/CD" in categories:
@@ -2953,7 +2953,7 @@ def business_impact(findings: list[Finding]) -> str:
     if "Archivos" in categories:
         impacts.append("riesgo de abuso en subidas de archivos")
     if not impacts:
-        return "No se han identificado impactos de negocio con las reglas automaticas actuales."
+        return "No se han identificado impactos de negocio con las reglas automáticas actuales."
     return "; ".join(impacts) + "."
 
 
@@ -2971,19 +2971,19 @@ def render_markdown(
     categories = category_counts(findings)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     disclaimer = (
-        "Esta auditoria automatica no sustituye una revision experta. "
+        "Esta auditoría automática no sustituye una revisión experta. "
         "Los hallazgos deben ser validados por un consultor especializado, "
         "ya que pueden existir falsos positivos, falsos negativos y riesgos contextuales "
-        "no detectables automaticamente."
+        "no detectables automáticamente."
     )
 
     lines = [
-        "# Informe de pre-auditoria de seguridad",
+        "# Informe de análisis preliminar de seguridad",
         "",
         f"**Cliente:** {meta.client}",
         f"**Auditor:** {meta.auditor}",
         f"**Alcance:** {meta.scope}",
-        f"**Version del informe:** {meta.version}",
+        f"**Versión del informe:** {meta.version}",
         f"**Stack declarado:** {STACKS.get(meta.stack, meta.stack)}",
         f"**Proyecto escaneado:** `{target}`",
         f"**SHA256 del proyecto:** `{project_sha or 'no calculado'}`",
@@ -2995,9 +2995,9 @@ def render_markdown(
         "",
         f"> {disclaimer}",
         "",
-        "## Resumen para direccion",
+        "## Resumen para dirección",
         "",
-        f"- Hallazgos criticos: {counts['Critica']}",
+        f"- Hallazgos críticos: {counts['Critica']}",
         f"- Hallazgos altos: {counts['Alta']}",
         f"- Hallazgos medios: {counts['Media']}",
         f"- Hallazgos bajos: {counts['Baja']}",
@@ -3007,9 +3007,9 @@ def render_markdown(
         "### Scoring profesional",
         "",
         "- P1: corregir inmediatamente.",
-        "- P2: corregir en 7 dias.",
-        "- P3: corregir en 30 dias.",
-        "- P4: revisar en la proxima iteracion.",
+        "- P2: corregir en 7 días.",
+        "- P3: corregir en 30 días.",
+        "- P4: revisar en la próxima iteración.",
         "",
     ]
 
@@ -3019,7 +3019,7 @@ def render_markdown(
             "### AI Agent Risk Score",
             "",
             f"- Riesgo del agente IA: **{ai_score}/100 — {ai_level}**",
-            f"- Factores: {', '.join(ai_reasons) if ai_reasons else 'No se detectaron factores especificos de agente IA.'}",
+            f"- Factores: {', '.join(ai_reasons) if ai_reasons else 'No se detectaron factores específicos de agente IA.'}",
             "",
         ]
     )
@@ -3049,7 +3049,7 @@ def render_markdown(
                 "",
                 f"- Modelo usado: {model}",
                 f"- Probables reales: {verdict_counts.get('probable_real', 0)}",
-                f"- Requieren revision: {verdict_counts.get('requiere_revision', 0)}",
+                f"- Requieren revisión: {verdict_counts.get('requiere_revision', 0)}",
                 f"- Probables falsos positivos: {verdict_counts.get('probable_falso_positivo', 0)}",
                 "",
             ]
@@ -3059,7 +3059,7 @@ def render_markdown(
     reviews = review_counts(findings, review_records)
     lines.extend(
         [
-            "### Validacion humana persistente",
+            "### Validación humana persistente",
             "",
             f"- Pendientes: {reviews['pending']}",
             f"- Confirmados manualmente: {reviews['confirmed']}",
@@ -3071,14 +3071,14 @@ def render_markdown(
         ]
     )
     if validation_points:
-        lines.extend(["### Puntos que requieren validacion manual", ""])
+        lines.extend(["### Puntos que requieren validación manual", ""])
         for point in validation_points:
             lines.append(f"- {point}")
         lines.append("")
 
     lines.extend(
         [
-        "### Distribucion por categoria",
+        "### Distribución por categoría",
         "",
         ]
     )
@@ -3087,12 +3087,12 @@ def render_markdown(
         for category, count in categories.items():
             lines.append(f"- {category}: {count}")
     else:
-        lines.append("- Sin categorias afectadas.")
+        lines.append("- Sin categorías afectadas.")
 
     lines.extend(
         [
             "",
-            "### Archivos con mas hallazgos",
+            "### Archivos con más hallazgos",
             "",
         ]
     )
@@ -3119,12 +3119,12 @@ def render_markdown(
                 f"- **{finding.severity}** - {finding.title} en `{finding.file}:{finding.line}`"
             )
     else:
-        lines.append("- No hay hallazgos criticos o altos con las reglas actuales.")
+        lines.append("- No hay hallazgos críticos o altos con las reglas actuales.")
 
     lines.extend(
         [
             "",
-            "## Informe tecnico",
+            "## Informe técnico",
             "",
         ]
     )
@@ -3134,7 +3134,7 @@ def render_markdown(
             [
                 "No se han detectado hallazgos con el conjunto de reglas actual.",
                 "",
-                "Esto no garantiza ausencia de vulnerabilidades; solo indica que no se han identificado patrones conocidos en este escaneo automatico.",
+                "Esto no garantiza ausencia de vulnerabilidades; solo indica que no se han identificado patrones conocidos en este escaneo automático.",
             ]
         )
         return "\n".join(lines) + "\n"
@@ -3151,13 +3151,13 @@ def render_markdown(
                 f"- **Impacto:** {impact_for(finding)}",
                 f"- **Probabilidad:** {likelihood_for(finding)}",
                 f"- **Prioridad:** {priority_for(finding)}",
-                f"- **Esfuerzo de correccion:** {finding.remediation_effort}",
+                f"- **Esfuerzo de corrección:** {finding.remediation_effort}",
                 f"- **SLA sugerido:** {remediation_sla(finding)}",
-                f"- **Categoria:** {finding.category}",
+                f"- **Categoría:** {finding.category}",
                 f"- **Archivo:** `{finding.file}:{finding.line}`",
                 f"- **Fingerprint:** `{finding.fingerprint}`",
                 f"- **Evidencia:** `{finding.evidence}`",
-                f"- **Validacion humana:** {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}",
+                f"- **Validación humana:** {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}",
                 "",
             ]
         )
@@ -3170,7 +3170,7 @@ def render_markdown(
                     f"- **Veredicto:** {assessment.get('verdict', 'requiere_revision')}",
                     f"- **Confianza:** {assessment.get('confidence', 'Baja')}",
                     f"- **Razonamiento:** {assessment.get('rationale', '')}",
-                    f"- **Validacion humana:** {assessment.get('auditor_validation', '')}",
+                    f"- **Validación humana:** {assessment.get('auditor_validation', '')}",
                     "",
                 ]
             )
@@ -3183,15 +3183,15 @@ def render_markdown(
                 finding.context,
                 "```",
                 "",
-                f"**Descripcion:** {finding.description}",
+                f"**Descripción:** {finding.description}",
                 "",
-                f"**Por que es peligroso:** {finding.why_dangerous}",
+                f"**Por qué es peligroso:** {finding.why_dangerous}",
                 "",
-                f"**Como explotarlo conceptualmente:** {finding.exploit_concept}",
+                f"**Cómo explotarlo conceptualmente:** {finding.exploit_concept}",
                 "",
-                f"**Como corregirlo:** {finding.recommendation}",
+                f"**Cómo corregirlo:** {finding.recommendation}",
                 "",
-                "**Ejemplo de codigo seguro:**",
+                "**Ejemplo de código seguro:**",
                 "",
                 "```",
                 finding.secure_example,
@@ -3199,11 +3199,11 @@ def render_markdown(
                 "",
                 f"**Referencia:** {finding.reference}",
                 "",
-                "**Checklist de correccion:**",
+                "**Checklist de corrección:**",
                 "",
                 "- [ ] Validar si el hallazgo aplica en el contexto real.",
-                "- [ ] Corregir la causa raiz, no solo la evidencia puntual.",
-                "- [ ] Anadir prueba o control preventivo.",
+                "- [ ] Corregir la causa raíz, no solo la evidencia puntual.",
+                "- [ ] Añadir prueba o control preventivo.",
                 "- [ ] Revisar despliegues, historiales y secretos afectados.",
                 "",
             ]
@@ -3211,12 +3211,12 @@ def render_markdown(
 
     lines.extend(
         [
-            "## Proximos pasos recomendados",
+            "## Próximos pasos recomendados",
             "",
-            "1. Validar manualmente los hallazgos criticos y altos.",
-            "2. Priorizar correcciones segun exposicion, datos afectados y facilidad de explotacion.",
+            "1. Validar manualmente los hallazgos críticos y altos.",
+            "2. Priorizar correcciones según exposición, datos afectados y facilidad de explotación.",
             "3. Repetir el escaneo tras las correcciones.",
-            "4. Completar una auditoria experta para riesgos de logica de negocio, arquitectura y contexto.",
+            "4. Completar una auditoría experta para riesgos de lógica de negocio, arquitectura y contexto.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -3246,16 +3246,16 @@ def render_html(
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     risk = global_risk(findings)
     disclaimer = (
-        "Esta auditoria automatica no sustituye una revision experta. "
+        "Esta auditoría automática no sustituye una revisión experta. "
         "Los hallazgos deben ser validados por un consultor especializado, "
         "ya que pueden existir falsos positivos, falsos negativos y riesgos contextuales "
-        "no detectables automaticamente."
+        "no detectables automáticamente."
     )
 
     category_rows = "\n".join(
         f"<tr><td>{html.escape(category)}</td><td>{count}</td></tr>"
         for category, count in categories.items()
-    ) or "<tr><td>Sin categorias afectadas</td><td>0</td></tr>"
+    ) or "<tr><td>Sin categorías afectadas</td><td>0</td></tr>"
     file_rows = "\n".join(
         f"<tr><td><code>{html.escape(file)}</code></td><td>{count}</td></tr>"
         for file, count in top_files(findings)
@@ -3267,7 +3267,7 @@ def render_html(
             f"<span><code>{html.escape(f.file)}:{f.line}</code></span></li>"
         )
         for f in [finding for finding in findings if finding.severity in {"Critica", "Alta"}][:10]
-    ) or "<li>No hay hallazgos criticos o altos con las reglas actuales.</li>"
+    ) or "<li>No hay hallazgos críticos o altos con las reglas actuales.</li>"
     ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
     comparison_html = ""
     if comparison:
@@ -3282,7 +3282,7 @@ def render_html(
     review_summary = review_counts(findings, review_records)
     review_html = f"""
     <section class="panel">
-      <h2>Validacion humana persistente</h2>
+      <h2>Validación humana persistente</h2>
       <p><strong>Pendientes:</strong> {review_summary['pending']} · <strong>Confirmados:</strong> {review_summary['confirmed']} · <strong>Falsos positivos:</strong> {review_summary['false_positive']} · <strong>Riesgos aceptados:</strong> {review_summary['accepted_risk']} · <strong>Corregidos:</strong> {review_summary['fixed']} · <strong>Revalidados:</strong> {review_summary['revalidated']}</p>
     </section>
 """
@@ -3295,7 +3295,7 @@ def render_html(
         ollama_html = f"""
     <section class="panel">
       <h2>Triage local con Ollama</h2>
-      <p><strong>Probables reales:</strong> {verdict_counts.get('probable_real', 0)} · <strong>Revision:</strong> {verdict_counts.get('requiere_revision', 0)} · <strong>Probables falsos positivos:</strong> {verdict_counts.get('probable_falso_positivo', 0)}</p>
+      <p><strong>Probables reales:</strong> {verdict_counts.get('probable_real', 0)} · <strong>Revisión:</strong> {verdict_counts.get('requiere_revision', 0)} · <strong>Probables falsos positivos:</strong> {verdict_counts.get('probable_falso_positivo', 0)}</p>
     </section>
 """
 
@@ -3321,16 +3321,16 @@ def render_html(
           <div><span>Confianza</span><strong>{html.escape(finding.confidence)}</strong></div>
           <div><span>Esfuerzo</span><strong>{html.escape(finding.remediation_effort)}</strong></div>
           <div><span>SLA sugerido</span><strong>{html.escape(remediation_sla(finding))}</strong></div>
-          <div><span>Validacion humana</span><strong>{html.escape(REVIEW_STATUSES[review_for_finding(finding, review_records)['status']])}</strong></div>
+          <div><span>Validación humana</span><strong>{html.escape(REVIEW_STATUSES[review_for_finding(finding, review_records)['status']])}</strong></div>
         </div>
         {related_findings_html(finding)}
         <pre>{html.escape(finding.context)}</pre>
-        {f"<div class='meta-grid'><div><span>Ollama</span><strong>{html.escape(assessment.get('verdict', 'requiere_revision'))}</strong></div><div><span>Confianza IA</span><strong>{html.escape(assessment.get('confidence', 'Baja'))}</strong></div><div><span>Validacion</span><strong>{html.escape(assessment.get('auditor_validation', 'Revisar manualmente'))}</strong></div></div><p>{html.escape(assessment.get('rationale', ''))}</p>" if assessment else ""}
+        {f"<div class='meta-grid'><div><span>Ollama</span><strong>{html.escape(assessment.get('verdict', 'requiere_revision'))}</strong></div><div><span>Confianza IA</span><strong>{html.escape(assessment.get('confidence', 'Baja'))}</strong></div><div><span>Validación</span><strong>{html.escape(assessment.get('auditor_validation', 'Revisar manualmente'))}</strong></div></div><p>{html.escape(assessment.get('rationale', ''))}</p>" if assessment else ""}
         <dl>
-          <dt>Descripcion</dt><dd>{html.escape(finding.description)}</dd>
-          <dt>Por que es peligroso</dt><dd>{html.escape(finding.why_dangerous)}</dd>
-          <dt>Explotacion conceptual</dt><dd>{html.escape(finding.exploit_concept)}</dd>
-          <dt>Correccion recomendada</dt><dd>{html.escape(finding.recommendation)}</dd>
+          <dt>Descripción</dt><dd>{html.escape(finding.description)}</dd>
+          <dt>Por qué es peligroso</dt><dd>{html.escape(finding.why_dangerous)}</dd>
+          <dt>Explotación conceptual</dt><dd>{html.escape(finding.exploit_concept)}</dd>
+          <dt>Corrección recomendada</dt><dd>{html.escape(finding.recommendation)}</dd>
           <dt>Ejemplo seguro</dt><dd><code>{html.escape(finding.secure_example)}</code></dd>
           <dt>Referencia</dt><dd>{html.escape(finding.reference)}</dd>
         </dl>
@@ -3345,7 +3345,7 @@ def render_html(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Informe profesional de pre-auditoria</title>
+  <title>Informe de análisis preliminar</title>
   <style>
     :root {{
       --ink: #18212f;
@@ -3416,12 +3416,12 @@ def render_html(
 <body>
   <main>
     <header>
-      <p class="eyebrow">Pre-Auditor IA · informe profesional</p>
-      <h1>Informe de pre-auditoria de seguridad</h1>
-      <p class="subtitle">Escaneo automatico local orientado a detectar riesgos, priorizar hallazgos y preparar una revision experta.</p>
+      <p class="eyebrow">Pre-Auditor IA · análisis preliminar local</p>
+      <h1>Informe de análisis preliminar de seguridad</h1>
+      <p class="subtitle">Escaneo automático local orientado a detectar patrones de riesgo, priorizar evidencias y preparar una revisión experta.</p>
       <div class="kpis">
         <div class="kpi"><span>Riesgo global</span><strong>{html.escape(risk)}</strong></div>
-        <div class="kpi"><span>Criticos</span><strong>{counts['Critica']}</strong></div>
+        <div class="kpi"><span>Críticos</span><strong>{counts['Critica']}</strong></div>
         <div class="kpi"><span>Altos</span><strong>{counts['Alta']}</strong></div>
         <div class="kpi"><span>Total</span><strong>{len(findings)}</strong></div>
         <div class="kpi"><span>CVSS medio</span><strong>{average_cvss(findings)}</strong></div>
@@ -3433,7 +3433,7 @@ def render_html(
     <section>
       <h2>Resumen ejecutivo</h2>
       <p><strong>Cliente:</strong> {html.escape(meta.client)} · <strong>Auditor:</strong> {html.escape(meta.auditor)}</p>
-      <p><strong>Alcance:</strong> {html.escape(meta.scope)} · <strong>Version:</strong> {html.escape(meta.version)} · <strong>Stack:</strong> {html.escape(STACKS.get(meta.stack, meta.stack))}</p>
+      <p><strong>Alcance:</strong> {html.escape(meta.scope)} · <strong>Versión:</strong> {html.escape(meta.version)} · <strong>Stack:</strong> {html.escape(STACKS.get(meta.stack, meta.stack))}</p>
       <p><strong>Proyecto:</strong> <code>{html.escape(str(target))}</code></p>
       <p><strong>SHA256 del proyecto:</strong> <code>{html.escape(project_sha or 'no calculado')}</code></p>
       <p><strong>Fecha:</strong> {html.escape(now)} · <strong>Perfil:</strong> {html.escape(profile)} · <strong>Reglas activas:</strong> {len(rules_for_profile(profile))}</p>
@@ -3442,44 +3442,44 @@ def render_html(
     <section class="panel">
       <h2>AI Agent Risk Score</h2>
       <p><strong>{ai_score}/100 — {html.escape(ai_level)}</strong></p>
-      <p>{html.escape(', '.join(ai_reasons) if ai_reasons else 'No se detectaron factores especificos de agente IA.')}</p>
+      <p>{html.escape(', '.join(ai_reasons) if ai_reasons else 'No se detectaron factores específicos de agente IA.')}</p>
     </section>
     {comparison_html}
     {ollama_html}
     {review_html}
     <section class="panel">
-      <h2>Puntos que requieren validacion manual</h2>
-      <ul>{manual_html or '<li>Validar manualmente hallazgos criticos y altos.</li>'}</ul>
+      <h2>Puntos que requieren validación manual</h2>
+      <ul>{manual_html or '<li>Validar manualmente hallazgos críticos y altos.</li>'}</ul>
     </section>
 
     <section class="grid">
       <div class="panel">
-        <h2>Distribucion por categoria</h2>
+        <h2>Distribución por categoría</h2>
         <table>{category_rows}</table>
       </div>
       <div class="panel">
-        <h2>Archivos con mas hallazgos</h2>
+        <h2>Archivos con más hallazgos</h2>
         <table>{file_rows}</table>
       </div>
     </section>
 
     <section>
-      <h2>Prioridades de validacion</h2>
+      <h2>Prioridades de validación</h2>
       <ul class="priority">{priority_items}</ul>
     </section>
 
     <section>
-      <h2>Informe tecnico</h2>
+      <h2>Informe técnico</h2>
       {findings_html}
     </section>
 
     <section>
-      <h2>Proximos pasos recomendados</h2>
+      <h2>Próximos pasos recomendados</h2>
       <ol>
-        <li>Validar manualmente hallazgos criticos y altos.</li>
-        <li>Confirmar explotabilidad real, exposicion y datos afectados.</li>
-        <li>Corregir causas raiz y anadir controles preventivos.</li>
-        <li>Repetir escaneo y cerrar evidencias con una revision experta.</li>
+        <li>Validar manualmente hallazgos críticos y altos.</li>
+        <li>Confirmar explotabilidad real, exposición y datos afectados.</li>
+        <li>Corregir causas raíz y añadir controles preventivos.</li>
+        <li>Repetir escaneo y cerrar evidencias con una revisión experta.</li>
       </ol>
     </section>
   </main>
@@ -3583,7 +3583,7 @@ def render_dashboard(
       <p><code id="target"></code></p>
       <div class="kpis">
         <div class="kpi"><span>Riesgo</span><strong id="risk"></strong></div>
-        <div class="kpi"><span>Criticos</span><strong id="crit"></strong></div>
+        <div class="kpi"><span>Críticos</span><strong id="crit"></strong></div>
         <div class="kpi"><span>Altos</span><strong id="high"></strong></div>
         <div class="kpi"><span>Total</span><strong id="total"></strong></div>
         <div class="kpi"><span>AI Agent</span><strong id="ai"></strong></div>
@@ -3594,7 +3594,7 @@ def render_dashboard(
     <section id="comparison-panel"></section>
     <div class="insights">
       <section class="panel">
-        <h2>Distribucion por severidad</h2>
+        <h2>Distribución por severidad</h2>
         <div id="severity-chart"></div>
       </section>
       <section class="panel">
@@ -3602,23 +3602,23 @@ def render_dashboard(
         <div id="compound-list"></div>
       </section>
       <section class="panel">
-        <h2>Categorias principales</h2>
+        <h2>Categorías principales</h2>
         <div id="category-chart"></div>
       </section>
       <section class="panel">
-        <h2>Archivos con mas riesgo</h2>
+        <h2>Archivos con más riesgo</h2>
         <div id="file-chart"></div>
       </section>
     </div>
     <div class="toolbar">
-      <input id="search" placeholder="Buscar por archivo, regla, descripcion...">
+      <input id="search" placeholder="Buscar por archivo, regla, descripción...">
       <select id="severity"><option value="">Todas las severidades</option></select>
-      <select id="category"><option value="">Todas las categorias</option></select>
+      <select id="category"><option value="">Todas las categorías</option></select>
       <button id="reset">Limpiar</button>
     </div>
     <div class="layout">
       <aside class="panel">
-        <h2>Categorias</h2>
+        <h2>Categorías</h2>
         <div id="categories"></div>
       </aside>
       <section>
@@ -3644,7 +3644,7 @@ def render_dashboard(
     if (data.comparison) {{
       document.getElementById('comparison-panel').innerHTML = `
         <div class="comparison-panel ${{esc(data.comparison.status)}}">
-          <h2>Comparativa antes/despues · ${{esc(data.comparison.status)}}</h2>
+          <h2>Comparativa antes/después · ${{esc(data.comparison.status)}}</h2>
           <p><code>${{esc(data.comparison.baseline)}}</code></p>
           <div class="comparison-grid">
             <div><span>Antes</span><strong>${{data.comparison.previous_total}}</strong></div>
@@ -3716,10 +3716,10 @@ def render_dashboard(
           </div>
           ${{relatedRows(f)}}
           <pre>${{esc(f.context)}}</pre>
-          <p><strong>Validacion humana:</strong> ${{esc(f.review?.status || 'pending')}} ${{f.review?.reviewed_by ? '· ' + esc(f.review.reviewed_by) : ''}}</p>
+          <p><strong>Validación humana:</strong> ${{esc(f.review?.status || 'pending')}} ${{f.review?.reviewed_by ? '· ' + esc(f.review.reviewed_by) : ''}}</p>
           ${{data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`] ? `<p><strong>Ollama:</strong> ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].verdict)}} · ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].confidence)}}. ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].rationale)}}</p>` : ''}}
           <p><strong>Riesgo:</strong> ${{esc(f.why_dangerous)}}</p>
-          <p><strong>Correccion:</strong> ${{esc(f.recommendation)}}</p>
+          <p><strong>Corrección:</strong> ${{esc(f.recommendation)}}</p>
         </article>`).join('');
     }}
     ['search','severity','category'].forEach(id => document.getElementById(id).addEventListener('input', render));
@@ -3758,11 +3758,11 @@ def write_pdf_report(
     def p(text: str, style: str = "BodyText") -> Paragraph:
         return Paragraph(html.escape(str(text)).replace("\n", "<br/>"), styles[style])
 
-    story.append(p("Informe de pre-auditoria de seguridad", "Title"))
+    story.append(p("Informe de análisis preliminar de seguridad", "Title"))
     story.append(p(f"Cliente: {meta.client}", "Heading2"))
     story.append(p(f"Auditor: {meta.auditor}"))
     story.append(p(f"Alcance: {meta.scope}"))
-    story.append(p(f"Version: {meta.version}"))
+    story.append(p(f"Versión: {meta.version}"))
     story.append(p(f"Stack: {STACKS.get(meta.stack, meta.stack)}"))
     story.append(p(f"Proyecto: {target}"))
     story.append(p(f"SHA256 proyecto: {project_sha or 'no calculado'}"))
@@ -3771,7 +3771,7 @@ def write_pdf_report(
 
     summary = Table(
         [
-            ["Riesgo global", "Criticos", "Altos", "Medios", "CVSS medio"],
+            ["Riesgo global", "Críticos", "Altos", "Medios", "CVSS medio"],
             [global_risk(findings), counts["Critica"], counts["Alta"], counts["Media"], average_cvss(findings)],
         ],
         hAlign="LEFT",
@@ -3790,19 +3790,19 @@ def write_pdf_report(
     )
     story.append(summary)
     story.append(Spacer(1, 14))
-    story.append(p("Esta auditoria automatica no sustituye una revision experta. Los hallazgos deben ser validados por un consultor especializado.", "Italic"))
+    story.append(p("Esta auditoría automática no sustituye una revisión experta. Los hallazgos deben ser validados por un consultor especializado.", "Italic"))
     story.append(Spacer(1, 18))
     ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
     story.append(p("AI Agent Risk Score", "Heading1"))
     story.append(p(f"{ai_score}/100 — {ai_level}"))
-    story.append(p(", ".join(ai_reasons) if ai_reasons else "No se detectaron factores especificos de agente IA."))
+    story.append(p(", ".join(ai_reasons) if ai_reasons else "No se detectaron factores específicos de agente IA."))
     story.append(Spacer(1, 12))
     if comparison:
         story.append(p("Comparativa contra baseline", "Heading1"))
         story.append(p(f"Nuevos: {comparison['new']} · Corregidos: {comparison['fixed']} · Persistentes: {comparison['persistent']}"))
         story.append(Spacer(1, 12))
     reviews = review_counts(findings, review_records)
-    story.append(p("Validacion humana persistente", "Heading1"))
+    story.append(p("Validación humana persistente", "Heading1"))
     story.append(
         p(
             f"Pendientes: {reviews['pending']} · Confirmados: {reviews['confirmed']} · "
@@ -3820,14 +3820,14 @@ def write_pdf_report(
         story.append(
             p(
                 f"Probables reales: {verdict_counts.get('probable_real', 0)} · "
-                f"Revision: {verdict_counts.get('requiere_revision', 0)} · "
+                f"Revisión: {verdict_counts.get('requiere_revision', 0)} · "
                 f"Probables falsos positivos: {verdict_counts.get('probable_falso_positivo', 0)}"
             )
         )
         story.append(Spacer(1, 12))
-    story.append(p("Prioridades de validacion", "Heading1"))
+    story.append(p("Prioridades de validación", "Heading1"))
 
-    priority_rows = [["Severidad", "Hallazgo", "Ubicacion", "CVSS"]]
+    priority_rows = [["Severidad", "Hallazgo", "Ubicación", "CVSS"]]
     for finding in findings[:12]:
         priority_rows.append([finding.severity, finding.title, f"{finding.file}:{finding.line}", finding.cvss])
     priority_table = Table(priority_rows, colWidths=[58, 220, 170, 45], hAlign="LEFT")
@@ -3845,14 +3845,14 @@ def write_pdf_report(
     )
     story.append(priority_table)
     story.append(Spacer(1, 18))
-    story.append(p("Detalle tecnico", "Heading1"))
+    story.append(p("Detalle técnico", "Heading1"))
 
     for finding in findings:
         story.append(p(f"{finding.rule_id} · {finding.title}", "Heading2"))
-        story.append(p(f"Severidad: {finding.severity} · CVSS: {finding.cvss} · Categoria: {finding.category} · Ubicacion: {finding.file}:{finding.line}"))
-        story.append(p(f"Validacion humana: {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}"))
+        story.append(p(f"Severidad: {finding.severity} · CVSS: {finding.cvss} · Categoría: {finding.category} · Ubicación: {finding.file}:{finding.line}"))
+        story.append(p(f"Validación humana: {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}"))
         if finding.related_findings:
-            story.append(p("Hallazgo compuesto: la severidad procede de la combinacion de varias evidencias relacionadas."))
+            story.append(p("Hallazgo compuesto: la severidad procede de la combinación de varias evidencias relacionadas."))
             for item in finding.related_findings:
                 story.append(
                     p(
@@ -3869,9 +3869,9 @@ def write_pdf_report(
                     f"{assessment.get('rationale', '')}"
                 )
             )
-        story.append(p(f"Descripcion: {finding.description}"))
+        story.append(p(f"Descripción: {finding.description}"))
         story.append(p(f"Riesgo: {finding.why_dangerous}"))
-        story.append(p(f"Correccion: {finding.recommendation}"))
+        story.append(p(f"Corrección: {finding.recommendation}"))
         story.append(p(f"Referencia: {finding.reference}"))
         story.append(Spacer(1, 10))
 
@@ -3948,14 +3948,14 @@ def write_json(
 
 def write_checklist(findings: list[Finding], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# Checklist de remediacion", ""]
+    lines = ["# Checklist de remediación", ""]
     for finding in findings:
         lines.extend(
             [
                 f"- [ ] **{priority_for(finding)} / {finding.severity}** `{finding.rule_id}` {finding.title}",
-                f"  - Ubicacion: `{finding.file}:{finding.line}`",
+                f"  - Ubicación: `{finding.file}:{finding.line}`",
                 f"  - SLA: {remediation_sla(finding)}",
-                f"  - Correccion: {finding.recommendation}",
+                f"  - Corrección: {finding.recommendation}",
                 "",
             ]
         )
@@ -3974,7 +3974,7 @@ def write_sarif(findings: list[Finding], output: Path) -> None:
             "help": {
                 "text": (
                     f"{finding.why_dangerous}\n\n"
-                    f"Recomendacion: {finding.recommendation}\n\n"
+                    f"Recomendación: {finding.recommendation}\n\n"
                     f"Referencia: {finding.reference}"
                 )
             },
@@ -4029,9 +4029,9 @@ def write_sarif(findings: list[Finding], output: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Pre-auditor local de seguridad para detectar riesgos y generar un informe inicial."
+        description="Análisis preliminar local de seguridad para detectar patrones de riesgo y generar entregables revisables."
     )
-    parser.add_argument("target", nargs="?", default=".", help="Carpeta de codigo a escanear.")
+    parser.add_argument("target", nargs="?", default=".", help="Carpeta de código a escanear.")
     parser.add_argument(
         "--out",
         default="preaudit-report.md",
@@ -4040,17 +4040,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--html",
         default=None,
-        help="Ruta opcional para generar tambien un informe HTML.",
+        help="Ruta opcional para generar también un informe HTML.",
     )
     parser.add_argument(
         "--pdf",
         default=None,
-        help="Ruta opcional para generar PDF desde el informe HTML usando cupsfilter si esta disponible.",
+        help="Ruta opcional para generar PDF desde el informe HTML usando cupsfilter si está disponible.",
     )
     parser.add_argument(
         "--dashboard",
         default=None,
-        help="Ruta opcional para generar un dashboard HTML local con filtros y busqueda.",
+        help="Ruta opcional para generar un dashboard HTML local con filtros y búsqueda.",
     )
     parser.add_argument(
         "--json",
@@ -4072,7 +4072,7 @@ def parse_args() -> argparse.Namespace:
         "--fail-on",
         choices=["Critica", "Alta", "Media", "Baja", "never"],
         default="Alta",
-        help="Devuelve codigo 1 si hay hallazgos de esta severidad o superior.",
+        help="Devuelve código 1 si hay hallazgos de esta severidad o superior.",
     )
     parser.add_argument(
         "--list-rules",
@@ -4081,23 +4081,23 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--client", default="Cliente no especificado", help="Nombre del cliente para el informe.")
     parser.add_argument("--auditor", default="Consultor especializado", help="Nombre del auditor o empresa auditora.")
-    parser.add_argument("--scope", default="Pre-auditoria automatica local", help="Alcance declarado del informe.")
-    parser.add_argument("--report-version", default="1.0", help="Version visible del informe entregado.")
+    parser.add_argument("--scope", default="Análisis preliminar automático local", help="Alcance declarado del informe.")
+    parser.add_argument("--report-version", default="1.0", help="Versión visible del informe entregado.")
     parser.add_argument("--ignore-file", default=None, help="Ruta opcional a un archivo de supresiones.")
     parser.add_argument("--rules-file", default=None, help="Ruta opcional a reglas custom YAML/JSON.")
-    parser.add_argument("--stack", choices=sorted(STACKS), default="generic", help="Stack tecnologico declarado para contextualizar el informe.")
+    parser.add_argument("--stack", choices=sorted(STACKS), default="generic", help="Stack tecnológico declarado para contextualizar el informe.")
     parser.add_argument("--baseline", default=None, help="Ruta para guardar un baseline JSON del escaneo actual.")
     parser.add_argument("--compare", default=None, help="Ruta a un baseline JSON previo para comparar nuevos/corregidos/persistentes.")
     parser.add_argument("--deliverable", nargs="?", const="auto", default=None, help="Genera una carpeta de entrega completa. Opcionalmente indica la ruta.")
     parser.add_argument("--ollama", action="store_true", help="Activa triage local con Ollama para hallazgos complejos.")
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434", help="URL base de Ollama.")
     parser.add_argument("--ollama-model", default="llama3.1", help="Modelo local de Ollama a usar para el triage.")
-    parser.add_argument("--ollama-limit", type=int, default=20, help="Numero maximo de hallazgos que se enviaran a Ollama.")
+    parser.add_argument("--ollama-limit", type=int, default=20, help="Número máximo de hallazgos que se enviarán a Ollama.")
     parser.add_argument(
         "--ollama-min-severity",
         choices=["Critica", "Alta", "Media", "Baja"],
         default="Alta",
-        help="Severidad minima que se enviara a Ollama.",
+        help="Severidad mínima que se enviará a Ollama.",
     )
     parser.add_argument(
         "--ollama-filter-fp",
@@ -4219,7 +4219,7 @@ def main() -> int:
         write_checklist(findings, checklist_path)
 
     counts = severity_counts(findings)
-    print(f"Pre-auditoria completada: {len(findings)} hallazgos.")
+    print(f"Análisis preliminar completado: {len(findings)} hallazgos.")
     print(
         "Severidad: "
         f"Critica={counts['Critica']} Alta={counts['Alta']} "

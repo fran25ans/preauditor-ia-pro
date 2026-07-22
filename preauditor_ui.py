@@ -148,7 +148,7 @@ def page_shell(content: str) -> bytes:
     <div class="topbar">
       <div>
         <h1>Pre-Auditor IA Pro</h1>
-        <p>Primer analista local de seguridad: detecta riesgos, prioriza hallazgos y genera un pack listo para revision experta.</p>
+        <p>Análisis local preliminar de seguridad para código, APIs, CI/CD, cloud e IA. Detecta patrones de riesgo, prioriza evidencias y genera entregables para validación experta.</p>
       </div>
       <div class="status">
         <span class="pill">Local</span>
@@ -226,7 +226,7 @@ def render_home() -> bytes:
         <label>Auditor</label>
         <input name="auditor" value="Francisco José Gimeno">
         <label>Alcance</label>
-        <input name="scope" value="Pre-auditoria local de seguridad">
+        <input name="scope" value="Análisis preliminar local de seguridad">
         <label>Versión del informe</label>
         <input name="report_version" value="{datetime.now().strftime('%Y.%m')}">
       </div>
@@ -254,19 +254,19 @@ def render_home() -> bytes:
         </select>
         <label class="check"><input type="checkbox" name="ollama_filter_fp" value="1"> Ocultar probables falsos positivos</label>
       </div>
-      <button id="scan-button" class="primary" type="submit">Generar pre-auditoria profesional</button>
+      <button id="scan-button" class="primary" type="submit">Generar análisis preliminar</button>
     </form>
   </section>
   <section class="panel">
     <h2>Panel de entrega</h2>
     <div id="result">
       <div class="empty">
-        <p><strong>Listo para generar un pack profesional.</strong></p>
-        <p>El resultado incluirá resumen ejecutivo, informe tecnico, dashboard, JSON, SARIF, baseline y checklist de remediacion.</p>
+        <p><strong>Listo para generar un pack de revisión preliminar.</strong></p>
+        <p>El resultado incluirá resumen ejecutivo, informe técnico, dashboard, JSON, SARIF, baseline y checklist de remediación.</p>
         <ul>
-          <li>La auditoria automatica no sustituye la revision experta.</li>
-          <li>Los hallazgos se entregan priorizados para validacion humana.</li>
-          <li>Usa la demo rapida para una presentacion controlada.</li>
+          <li>La auditoría automática no sustituye la revisión experta.</li>
+          <li>Los hallazgos se entregan priorizados para validación humana.</li>
+          <li>Usa la demo rápida para una presentación controlada.</li>
         </ul>
       </div>
     </div>
@@ -370,7 +370,7 @@ const customRulesTemplate = `rules:
       - "*.ts"
       - "*.py"
       - "*.env*"
-    description: Detecta flags internos que pueden desactivar autenticacion o controles de seguridad.
+    description: Detecta flags internos que pueden desactivar autenticación o controles de seguridad.
     why_dangerous: Si este flag llega a produccion, puede permitir acceso no autorizado.
     exploit_concept: Un atacante podria aprovechar endpoints o flujos sin controles efectivos.
     recommendation: Eliminar el flag o limitarlo a tests aislados fuera de produccion.
@@ -492,7 +492,7 @@ document.getElementById('guided-demo').addEventListener('click', () => {{
   result.innerHTML = `
     <div class="empty">
       <p><strong>Demo guiada preparada.</strong></p>
-      <p>Pulsa “Generar pre-auditoría profesional” y enseña los entregables en este orden:</p>
+      <p>Pulsa “Generar análisis preliminar” y enseña los entregables en este orden:</p>
       <ul>
         <li>Dashboard: vista ejecutiva y filtros.</li>
         <li>Informe técnico HTML: evidencia y remediación.</li>
@@ -595,7 +595,7 @@ async function saveReview(button) {{
   }});
   const data = await response.json();
   if (!response.ok) {{
-    alert(data.error || 'No se pudo guardar la validacion');
+    alert(data.error || 'No se pudo guardar la validación');
     return;
   }}
   button.textContent = 'Guardado';
@@ -666,7 +666,7 @@ form.addEventListener('submit', async (event) => {{
     result.innerHTML = `
       <div class="kpis">
         <div class="kpi"><span>Riesgo</span><strong>${{data.risk}}</strong></div>
-        <div class="kpi"><span>Criticos</span><strong>${{data.counts.Critica}}</strong></div>
+        <div class="kpi"><span>Críticos</span><strong>${{data.counts.Critica}}</strong></div>
         <div class="kpi"><span>Altos</span><strong>${{data.counts.Alta}}</strong></div>
         <div class="kpi"><span>Total</span><strong>${{data.findings.length}}</strong></div>
         <div class="kpi"><span>AI Agent</span><strong>${{data.ai.score}}/100</strong></div>
@@ -782,7 +782,7 @@ def save_custom_rules_text(path_value: str, text: str, allow_external_write: boo
 def save_review_decision(payload: dict) -> dict:
     review_path = Path(payload.get("review_path", "")).expanduser().resolve()
     if review_path.suffix.lower() != ".json":
-        raise ValueError("La validacion humana debe guardarse en un archivo JSON.")
+        raise ValueError("La validación humana debe guardarse en un archivo JSON.")
     if not any(is_within(review_path, root) for root in GENERATED_ARTIFACT_ROOTS):
         raise ValueError("review.json solo puede guardarse en carpetas generadas por la herramienta en esta sesion.")
     review_path.parent.mkdir(parents=True, exist_ok=True)
@@ -841,7 +841,7 @@ def scan_project(payload: dict) -> dict:
     meta = preauditor.ReportMeta(
         client=payload.get("client", "Cliente no especificado"),
         auditor=payload.get("auditor", "Consultor especializado"),
-        scope=payload.get("scope", "Pre-auditoria local de seguridad"),
+        scope=payload.get("scope", "Análisis preliminar local de seguridad"),
         version=payload.get("report_version", "1.0"),
         stack=stack,
     )
@@ -1119,7 +1119,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Interfaz web local de Pre-Auditor IA Pro.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--open", action="store_true", help="Abrir automaticamente en el navegador.")
+    parser.add_argument("--open", action="store_true", help="Abrir automáticamente en el navegador.")
     parser.add_argument("--allow-remote", action="store_true", help="Permite escuchar fuera de loopback. Uso no recomendado.")
     return parser.parse_args()
 

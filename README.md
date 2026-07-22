@@ -1,17 +1,17 @@
 # Pre-Auditor IA Pro
 
-Herramienta local para hacer una primera lectura profesional de riesgos en proyectos con APIs, automatizaciones, infraestructura e integraciones de IA. No pretende ser el auditor final: detecta patrones, prioriza hallazgos y genera un informe inicial para abrir una revision experta.
+Herramienta local para hacer un análisis preliminar de riesgos en proyectos con APIs, automatizaciones, infraestructura e integraciones de IA. No pretende ser el auditor final: detecta patrones, prioriza hallazgos y genera entregables para revisión experta del equipo.
 
-> Esta auditoria automatica no sustituye una revision experta. Los hallazgos deben ser validados por un consultor especializado, ya que pueden existir falsos positivos, falsos negativos y riesgos contextuales no detectables automaticamente.
+> Esta auditoría automática no sustituye una revisión experta. Los hallazgos deben ser validados por una persona especializada, ya que pueden existir falsos positivos, falsos negativos y riesgos contextuales no detectables automáticamente.
 
-## Instalacion como comando
+## Instalación como comando
 
 Pre-Auditor IA Pro instala dos comandos locales:
 
 - `preauditor`
 - `preauditor-ui`
 
-### Instalacion rapida recomendada
+### Instalación rápida recomendada
 
 Instala el wheel publicado en la release `v0.1.0`:
 
@@ -19,22 +19,22 @@ Instala el wheel publicado en la release `v0.1.0`:
 python3 -m pip install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
 ```
 
-Comprueba la instalacion:
+Comprueba la instalación:
 
 ```bash
 preauditor --profile pro --list-rules
 preauditor-ui
 ```
 
-Pagina de la release:
+Página de la release:
 
 ```text
 https://github.com/fran25ans/preauditor-ia-pro/releases/tag/v0.1.0
 ```
 
-### Instalacion aislada con pipx
+### Instalación aislada con pipx
 
-Recomendado si quieres usarlo como herramienta de linea de comandos sin mezclar dependencias con otros proyectos:
+Recomendado si quieres usarlo como herramienta de línea de comandos sin mezclar dependencias con otros proyectos:
 
 ```bash
 python3 -m pip install pipx
@@ -43,7 +43,7 @@ python3 -m pipx install "https://github.com/fran25ans/preauditor-ia-pro/releases
 
 ### Desde el tag de GitHub
 
-Instala directamente una version concreta del repositorio:
+Instala directamente una versión concreta del repositorio:
 
 ```bash
 python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v0.1.0"
@@ -57,13 +57,13 @@ Si ya tienes el archivo `.whl` descargado:
 python3 -m pip install preauditor_ia-0.1.0-py3-none-any.whl
 ```
 
-O, si estas dentro del proyecto y tienes el wheel generado en `dist/`:
+O, si estás dentro del proyecto y tienes el wheel generado en `dist/`:
 
 ```bash
 python3 -m pip install dist/preauditor_ia-0.1.0-py3-none-any.whl
 ```
 
-### Desde el codigo fuente
+### Desde el código fuente
 
 Para desarrollo local, instala en modo editable:
 
@@ -71,15 +71,15 @@ Para desarrollo local, instala en modo editable:
 python3 -m pip install -e . --no-build-isolation
 ```
 
-Tambien puedes usar el instalador local del repositorio:
+También puedes usar el instalador local del repositorio:
 
 ```bash
 sh install.sh
 ```
 
-### Reinstalar la version publicada
+### Reinstalar la versión publicada
 
-Si ya tenias una version previa instalada y quieres reinstalar:
+Si ya tenías una versión previa instalada y quieres reinstalar:
 
 ```bash
 python3 -m pip install --force-reinstall "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
@@ -87,7 +87,7 @@ python3 -m pip install --force-reinstall "https://github.com/fran25ans/preaudito
 
 ## Interfaz web local
 
-Ademas de la CLI, puedes usar una interfaz local en navegador:
+Además de la CLI, puedes usar una interfaz local en navegador:
 
 ```bash
 preauditor-ui
@@ -103,14 +103,14 @@ Desde esa pantalla puedes:
 
 - indicar la ruta del proyecto
 - seleccionar perfil y stack
-- rellenar cliente, auditor, alcance y version
-- comparar contra un `baseline.json` anterior para ver antes/despues
-- marcar validacion humana persistente en `review.json`
+- rellenar cliente, auditor, alcance y versión
+- comparar contra un `baseline.json` anterior para ver antes/después
+- marcar validación humana persistente en `review.json`
 - activar triage local con Ollama si lo tienes arrancado
 - generar el pack completo de entrega
 - abrir informe, PDF, dashboard, JSON, SARIF, baseline y checklist
 
-Si quieres que intente abrir el navegador automaticamente:
+Si quieres que intente abrir el navegador automáticamente:
 
 ```bash
 preauditor-ui --open
@@ -118,19 +118,19 @@ preauditor-ui --open
 
 ### Modelo de seguridad de la UI local
 
-La interfaz web esta pensada para uso local del equipo, no como servicio publico ni SaaS.
+La interfaz web está pensada para uso local del equipo, no como servicio público ni SaaS.
 
 Controles aplicados:
 
 - escucha en `127.0.0.1` por defecto
 - rechaza arrancar fuera de loopback salvo `--allow-remote`
-- token aleatorio por sesion para operaciones `POST`
-- validacion de `Host` y `Origin`
+- token aleatorio por sesión para operaciones `POST`
+- validación de `Host` y `Origin`
 - peticiones `POST` solo con `Content-Type: application/json`
-- limite de tamano para peticiones
+- límite de tamaño para peticiones
 - cabeceras `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Cache-Control` y `X-Frame-Options`
 - los artefactos se sirven solo desde carpetas de entrega generadas por la herramienta
-- las escrituras fuera de la carpeta de trabajo requieren confirmacion explicita en la UI
+- las escrituras fuera de la carpeta de trabajo requieren confirmación explícita en la UI
 
 No abras la UI en `0.0.0.0` ni la expongas a redes compartidas salvo que entiendas el riesgo y controles el entorno.
 
@@ -138,28 +138,28 @@ No abras la UI en `0.0.0.0` ni la expongas a redes compartidas salvo que entiend
 
 ![Ejecución local de Pre-Auditor IA Pro](docs/assets/terminalweb.png)
 
-## Que detecta
+## Qué detecta
 
-El perfil `pro` incluye 100 reglas activas repartidas por API, IA, CI/CD, supply chain, secretos, contenedores, Kubernetes, cloud/Terraform, infraestructura, autenticacion, sesiones, frontend, privacidad, resiliencia, criptografia e inyecciones.
+El perfil `pro` incluye 100 reglas activas repartidas por API, IA, CI/CD, supply chain, secretos, contenedores, Kubernetes, cloud/Terraform, infraestructura, autenticación, sesiones, frontend, privacidad, resiliencia, criptografía e inyecciones.
 
 - API keys, tokens y secretos expuestos
 - Archivos `.env`, claves privadas y ficheros de credenciales
 - CORS abierto
-- Endpoints aparentemente sin autenticacion
+- Endpoints aparentemente sin autenticación
 - Permisos excesivos en GitHub Actions
 - Uso de `eval`, `exec`, `shell_exec`, `subprocess(..., shell=True)` y similares
 - Prompts de sistema visibles
-- Llamadas a IA que requieren validacion de salida
-- Agentes con autonomia elevada
+- Llamadas a IA que requieren validación de salida
+- Agentes con autonomía elevada
 - Herramientas IA con permisos amplios
 - Logs con datos sensibles
-- Subida de archivos sin validacion evidente
-- SQL construido por concatenacion
+- Subida de archivos sin validación evidente
+- SQL construido por concatenación
 - TLS desactivado
 - Debug activo
-- Deserializacion insegura
-- JWT sin verificacion de firma
-- Criptografia debil
+- Deserialización insegura
+- JWT sin verificación de firma
+- Criptografía débil
 - CSP permisiva
 - Contenedores privilegiados o root
 - Infraestructura abierta a `0.0.0.0/0`
@@ -173,39 +173,39 @@ El perfil `pro` incluye 100 reglas activas repartidas por API, IA, CI/CD, supply
 - Secretos/OIDC en jobs de CI
 - Uso de `sudo` en pipelines
 - Dependencias instaladas sin version fija
-- Imagenes Docker con `latest`
+- Imágenes Docker con `latest`
 - Kubernetes privilegiado, `hostPath`, root o RBAC excesivo
 - IAM con wildcards
-- Buckets S3 publicos
+- Buckets S3 públicos
 - Bases de datos o workloads cloud expuestos
-- Autenticacion/autorizacion desactivada
+- Autenticación/autorización desactivada
 - Credenciales por defecto
 - Path traversal, XXE, redirect abierto y XSS
-- Webhooks sin verificacion de firma
+- Webhooks sin verificación de firma
 - RAG/embeddings sin control de fuente
-- Ejecucion de codigo influida por IA
-- Telemetria/logs de IA con posible contenido sensible
+- Ejecución de código influida por IA
+- Telemetría/logs de IA con posible contenido sensible
 - HSTS, TLS antiguo y cabeceras anti-clickjacking
 - OAuth redirect URI inseguro, `state`/`nonce` ausente y JWT `none`
 - Cifrado en reposo desactivado
-- Backups, snapshot final o proteccion contra borrado desactivados
+- Backups, snapshot final o protección contra borrado desactivados
 - PII en logs
 - Cache de CI con `.env` o credenciales
 - Docker `COPY .`, `ADD` remoto y capabilities amplias
 - Kubernetes service account token automontado
-- GraphQL introspection/playground en produccion
+- GraphQL introspection/playground en producción
 - Errores detallados o stack traces expuestos
-- CORS reflejando origen dinamico
-- Guardrails, moderacion o validacion de salida IA desactivados
+- CORS reflejando origen dinámico
+- Guardrails, moderación o validación de salida IA desactivados
 - Swagger/OpenAPI o Actuator expuestos
 - Elasticsearch, Redis, MongoDB, RabbitMQ, Kafka o MinIO inseguros
-- Lockfiles ausentes o instalacion no reproducible en CI
-- Dependencias `latest`, comodin, Git o rutas locales
+- Lockfiles ausentes o instalación no reproducible en CI
+- Dependencias `latest`, comodín, Git o rutas locales
 - TLS/integridad desactivada en gestores de paquetes
 - Comandos destructivos en pipelines
 - Terraform backend/state y outputs sensibles
-- Buckets publicos en Azure/GCP
-- MFA desactivado y ausencia de proteccion anti-replay
+- Buckets públicos en Azure/GCP
+- MFA desactivado y ausencia de protección anti-replay
 
 ## Uso
 
@@ -219,7 +219,7 @@ Ejemplo desde esta carpeta:
 python3 preauditor.py ./sample-vulnerable --profile pro --out reports/sample-pro.md --html reports/sample-pro.html --json reports/sample-pro.json --sarif reports/sample-pro.sarif
 ```
 
-La CLI devuelve codigo `1` si encuentra hallazgos criticos o altos por defecto. Puedes ajustar el umbral:
+La CLI devuelve código `1` si encuentra hallazgos críticos o altos por defecto. Puedes ajustar el umbral:
 
 ```bash
 python3 preauditor.py ./mi-app --fail-on Critica
@@ -228,15 +228,15 @@ python3 preauditor.py ./mi-app --fail-on never
 
 ## Perfiles
 
-- `basic`: reglas esenciales para una version gratuita o lead magnet.
-- `pro`: reglas ampliadas, scoring, exportaciones y reporte profesional.
+- `basic`: reglas esenciales para una revisión rápida.
+- `pro`: reglas ampliadas, scoring, exportaciones y reporte completo.
 - `ai`: foco en agentes IA, permisos, prompts, CI/CD y secretos.
-- `api`: foco en APIs, autenticacion, sesiones, frontend, privacidad e inyecciones.
+- `api`: foco en APIs, autenticación, sesiones, frontend, privacidad e inyecciones.
 - `cloud`: foco en cloud, Kubernetes, contenedores, infraestructura y resiliencia.
 - `cicd`: foco en pipelines, supply chain, secretos y agentes.
-- `fintech`: foco en APIs, autenticacion, privacidad, criptografia, cloud, CI/CD e IA.
+- `fintech`: foco en APIs, autenticación, privacidad, criptografía, cloud, CI/CD e IA.
 
-Para ver el catalogo completo de reglas:
+Para ver el catálogo completo de reglas:
 
 ```bash
 python3 preauditor.py --profile pro --list-rules
@@ -251,7 +251,7 @@ python3 preauditor.py ./mi-app \
   --profile fintech \
   --client "ACME Payments" \
   --auditor "Tu Nombre / Tu Empresa" \
-  --scope "Revision inicial de seguridad de API, CI/CD e IA" \
+  --scope "Revisión inicial de seguridad de API, CI/CD e IA" \
   --report-version "2026.05" \
   --out informe-acme.md \
   --html informe-acme.html \
@@ -259,7 +259,7 @@ python3 preauditor.py ./mi-app \
   --dashboard dashboard-acme.html
 ```
 
-El dashboard es un HTML local con busqueda, filtro por severidad y filtro por categoria. El PDF se genera automaticamente con `reportlab` cuando esta disponible en el Python que ejecuta la herramienta.
+El dashboard es un HTML local con búsqueda, filtro por severidad y filtro por categoría. El PDF se genera automáticamente con `reportlab` cuando está disponible en el Python que ejecuta la herramienta.
 
 ### Dashboard local
 
@@ -279,7 +279,7 @@ preauditor ./mi-app \
   --stack springboot \
   --client "ACME" \
   --auditor "Francisco José Gimeno" \
-  --scope "Pre-auditoria de seguridad aplicacion/API/CI-CD" \
+  --scope "Análisis preliminar de seguridad aplicación/API/CI-CD" \
   --report-version "2026.05" \
   --deliverable ACME-preauditoria-2026-05 \
   --fail-on never
@@ -298,13 +298,13 @@ La carpeta contiene:
 
 ## Baseline y comparativas
 
-Primera auditoria:
+Primera auditoría:
 
 ```bash
 preauditor ./mi-app --profile pro --baseline baseline.json --out informe.md
 ```
 
-Auditorias posteriores:
+Auditorías posteriores:
 
 ```bash
 preauditor ./mi-app --profile pro --compare baseline.json --out informe-comparado.md
@@ -312,18 +312,18 @@ preauditor ./mi-app --profile pro --compare baseline.json --out informe-comparad
 
 La salida indica hallazgos nuevos, corregidos y persistentes.
 
-En la UI local, la opcion `Comparar con baseline anterior de la carpeta de salida` viene activada por defecto. El flujo recomendado es:
+En la UI local, la opción `Comparar con baseline anterior de la carpeta de salida` viene activada por defecto. El flujo recomendado es:
 
 1. Ejecutar un primer escaneo para generar `baseline.json`.
 2. Corregir hallazgos en el proyecto.
 3. Ejecutar de nuevo usando la misma carpeta de salida.
-4. Revisar la tarjeta `Comparativa antes/despues` en la UI y en el dashboard.
+4. Revisar la tarjeta `Comparativa antes/después` en la UI y en el dashboard.
 
 Esto permite demostrar progreso: hallazgos nuevos, corregidos, persistentes y porcentaje de mejora.
 
-## Validacion humana persistente
+## Validación humana persistente
 
-La herramienta diferencia entre deteccion automatica, triage opcional con Ollama y validacion humana. La decision humana se guarda en `review.json`, indexada por fingerprint del hallazgo.
+La herramienta diferencia entre detección automática, triage opcional con Ollama y validación humana. La decisión humana se guarda en `review.json`, indexada por fingerprint del hallazgo.
 
 Estados disponibles:
 
@@ -332,24 +332,24 @@ Estados disponibles:
 - `false_positive`: falso positivo.
 - `accepted_risk`: riesgo aceptado.
 - `fixed`: corregido.
-- `revalidated`: revalidado tras correccion.
+- `revalidated`: revalidado tras corrección.
 
 El archivo `review.json` conserva:
 
 - fingerprint
 - estado
 - revisor
-- fecha de revision
+- fecha de revisión
 - razonamiento
 - ticket
-- commit de correccion
-- evidencia de verificacion
+- commit de corrección
+- evidencia de verificación
 
 Ollama no modifica estos estados. Solo aporta triage auxiliar; el veredicto humano queda separado y persistente.
 
 ## Triage local con Ollama
 
-Opcionalmente puedes usar Ollama como segundo analista local para revisar los hallazgos mas complejos antes de que los mire el auditor humano. Por defecto no elimina hallazgos: solo añade un veredicto de triage al Markdown, HTML, PDF, dashboard y JSON.
+Opcionalmente puedes usar Ollama como segundo analista local para revisar los hallazgos más complejos antes de que los mire el auditor humano. Por defecto no elimina hallazgos: solo añade un veredicto de triage al Markdown, HTML, PDF, dashboard y JSON.
 
 Primero arranca Ollama y descarga un modelo:
 
@@ -358,7 +358,7 @@ ollama pull llama3.1
 ollama serve
 ```
 
-Despues lanza el escaneo con triage:
+Después lanza el escaneo con triage:
 
 ```bash
 preauditor ./mi-app \
@@ -377,17 +377,17 @@ Campos que añade:
 - `requiere_revision`: falta contexto y debe validarlo el auditor.
 - `probable_falso_positivo`: puede no aplicar al contexto real.
 
-Si quieres que el informe oculte automaticamente hallazgos que Ollama marque como probable falso positivo con confianza media o alta, usa:
+Si quieres que el informe oculte automáticamente hallazgos que Ollama marque como probable falso positivo con confianza media o alta, usa:
 
 ```bash
 preauditor ./mi-app --profile pro --ollama --ollama-filter-fp
 ```
 
-Recomendacion profesional: usa `--ollama-filter-fp` solo en revisiones internas o CI/CD. Para entregables de cliente, es mejor dejar los hallazgos visibles con su etiqueta de triage para no esconder riesgos contextuales.
+Recomendación: usa `--ollama-filter-fp` solo en revisiones internas o CI/CD. Para entregables externos, es mejor dejar los hallazgos visibles con su etiqueta de triage para no esconder riesgos contextuales.
 
-## Supresion de falsos positivos
+## Supresión de falsos positivos
 
-Si un hallazgo ya fue validado y aceptado, crea un archivo `.preauditor-ignore` en la raiz del proyecto escaneado o pasa uno con `--ignore-file`.
+Si un hallazgo ya fue validado y aceptado, crea un archivo `.preauditor-ignore` en la raíz del proyecto escaneado o pasa uno con `--ignore-file`.
 
 Formatos soportados:
 
@@ -403,7 +403,7 @@ Hay una plantilla en `.preauditor-ignore.example`.
 
 ## Reglas custom YAML/JSON
 
-Puedes añadir reglas propias sin tocar el motor de Python. Esto sirve para politicas internas, patrones de cliente, nombres de dominios, flags prohibidos o configuraciones que solo aplican a tu empresa.
+Puedes añadir reglas propias sin tocar el motor de Python. Esto sirve para políticas internas, patrones de cliente, nombres de dominios, flags prohibidos o configuraciones que solo aplican a tu empresa.
 
 El diseño recomendado es:
 
@@ -450,19 +450,19 @@ preauditor-ui
 
 Abre `http://127.0.0.1:8765/` y pulsa `Reglas custom`.
 
-Desde ahi puedes:
+Desde ahí puedes:
 
 - Cargar una plantilla YAML.
 - Editar reglas propias del cliente.
 - Validar que las regex compilan y que la severidad es correcta.
 - Guardar el archivo `.yml`.
-- Usarlo automaticamente en el siguiente escaneo.
+- Usarlo automáticamente en el siguiente escaneo.
 
-Las reglas internas del catalogo no se editan desde la UI. Esto mantiene trazabilidad y evita alterar el criterio base de auditoria. Para adaptar la herramienta a una empresa, crea un pack externo tipo `acme-rules.yml` y versionalo junto a la politica de seguridad del cliente.
+Las reglas internas del catálogo no se editan desde la UI. Esto mantiene trazabilidad y evita alterar el criterio base de auditoría. Para adaptar la herramienta a una empresa, crea un pack externo tipo `acme-rules.yml` y versiónalo junto a la política de seguridad del cliente.
 
 ## Tests de la herramienta
 
-Los tests no auditan un proyecto: verifican que el propio motor sigue detectando reglas criticas y que no se rompen las salidas principales.
+Los tests no auditan un proyecto: verifican que el propio motor sigue detectando reglas críticas y que no se rompen las salidas principales.
 
 ```bash
 python3 -m unittest discover -s tests
@@ -470,11 +470,11 @@ python3 -m unittest discover -s tests
 
 Cubren secretos, workflows IA, hallazgos compuestos, perfiles, supresiones y metadatos del informe.
 
-Las pruebas de Ollama no llaman al modelo real: verifican el parseo de JSON y el filtro explicito de falsos positivos para que la suite siga siendo rapida y reproducible.
+Las pruebas de Ollama no llaman al modelo real: verifican el parseo de JSON y el filtro explícito de falsos positivos para que la suite siga siendo rápida y reproducible.
 
 ## Hallazgos compuestos
 
-Ademas de reglas individuales, el motor genera hallazgos compuestos cuando detecta combinaciones peligrosas, por ejemplo:
+Además de reglas individuales, el motor genera hallazgos compuestos cuando detecta combinaciones peligrosas, por ejemplo:
 
 - Workspace confiable + prompt desde PR + permisos de escritura del agente.
 - CORS abierto + credenciales habilitadas.
@@ -483,21 +483,21 @@ Ademas de reglas individuales, el motor genera hallazgos compuestos cuando detec
 
 El informe generado tiene dos partes:
 
-- Resumen para direccion: riesgo global, conteo por severidad, impacto de negocio y prioridades.
-- Informe tecnico: evidencia enmascarada, contexto, archivo, linea aproximada, CVSS aproximado, confianza, esfuerzo, SLA sugerido, descripcion, explotacion conceptual, correccion, ejemplo seguro, referencia OWASP y checklist.
+- Resumen para dirección: riesgo global, conteo por severidad, impacto de negocio y prioridades.
+- Informe técnico: evidencia enmascarada, contexto, archivo, línea aproximada, CVSS aproximado, confianza, esfuerzo, SLA sugerido, descripción, explotación conceptual, corrección, ejemplo seguro, referencia OWASP y checklist.
 
-## Exportaciones profesionales
+## Exportaciones
 
-- Markdown para entrega rapida o revision interna.
-- HTML imprimible para cliente y conversion manual a PDF desde el navegador.
+- Markdown para entrega rápida o revisión interna.
+- HTML imprimible para revisión y conversión manual a PDF desde el navegador.
 - JSON para integraciones propias.
 - SARIF 2.1.0 para pipelines y plataformas compatibles con code scanning.
 
 ## Tipos de archivo soportados
 
-El escaner revisa codigo y configuracion en texto plano (`.py`, `.js`, `.ts`, `.yml`, `.yaml`, `.md`, `.tf`, `Dockerfile`, etc.) y tambien extrae texto basico de `.docx` para contrastar informes o documentos de auditoria.
+El escáner revisa código y configuración en texto plano (`.py`, `.js`, `.ts`, `.yml`, `.yaml`, `.md`, `.tf`, `Dockerfile`, etc.) y también extrae texto básico de `.docx` para contrastar informes o documentos de auditoría.
 
-Si quieres revisar un unico archivo, colocalo dentro de una carpeta y escanea esa carpeta:
+Si quieres revisar un único archivo, colócalo dentro de una carpeta y escanea esa carpeta:
 
 ```bash
 mkdir -p /tmp/preaudit-check
@@ -505,12 +505,12 @@ cp /ruta/al/archivo.docx /tmp/preaudit-check/
 python3 preauditor.py /tmp/preaudit-check --profile pro --out informe-docx.md --html informe-docx.html
 ```
 
-## Modelo profesional sugerido
+## Modelo de uso sugerido
 
-- Herramienta local gratuita: escaneo basico, informe resumido y reglas iniciales.
-- Version profesional: mas reglas, HTML imprimible, CVSS aproximado, SARIF, exportacion para cliente y recomendaciones avanzadas.
-- Servicio experto: validacion manual, correccion de codigo, formacion del equipo y plan de mitigacion.
+- Uso rápido: escaneo básico, informe resumido y reglas esenciales.
+- Uso interno de equipo: perfil `pro`, dashboard, baseline, validación humana y pack de entrega.
+- Uso experto: validación manual, corrección de código, formación del equipo y plan de mitigación.
 
 ## Limitaciones
 
-El motor usa reglas estaticas y patrones, y opcionalmente puede apoyarse en Ollama para triage local. Esto es rapido y transparente, pero puede producir falsos positivos y falsos negativos. Los riesgos de arquitectura, logica de negocio, autorizacion contextual y explotabilidad real requieren revision experta.
+El motor usa reglas estáticas y patrones, y opcionalmente puede apoyarse en Ollama para triage local. Esto es rápido y transparente, pero puede producir falsos positivos y falsos negativos. Los riesgos de arquitectura, lógica de negocio, autorización contextual y explotabilidad real requieren revisión experta.
