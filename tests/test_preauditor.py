@@ -173,6 +173,14 @@ class PreauditorRuleTests(unittest.TestCase):
         self.assertIn("Possible exposed secret or API key", json_text)
         self.assertIn("Possible exposed secret or API key", sarif_text)
 
+    def test_ui_home_includes_english_toggle_assets(self):
+        html_text = preauditor_ui.render_home().decode("utf-8")
+        self.assertIn('data-i18n="headerSubtitle"', html_text)
+        self.assertIn("Interface and Report Language", html_text)
+        self.assertIn("Generate Preliminary Analysis", html_text)
+        self.assertIn("rulesCatalogEn", html_text)
+        self.assertIn("UI_TRANSLATIONS", html_text)
+
     def test_parse_ollama_json_with_extra_text(self):
         parsed = preauditor.parse_ollama_json(
             'Respuesta:\n{"verdict":"probable_real","confidence":"Media","rationale":"coincide","auditor_validation":"validar contexto"}'
