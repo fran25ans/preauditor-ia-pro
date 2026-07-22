@@ -9,7 +9,7 @@ import json
 import tempfile
 import threading
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
@@ -18,6 +18,10 @@ import preauditor
 
 
 APP_ROOT = Path.cwd().resolve()
+
+
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def page_shell(content: str) -> bytes:
@@ -103,8 +107,10 @@ def page_shell(content: str) -> bytes:
     .comparison-grid div {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; }}
     .comparison-grid span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
     .comparison-grid strong {{ display:block; margin-top:4px; font-size:20px; }}
+    .review-controls {{ display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:8px; margin-top:8px; }}
+    .review-controls button {{ margin-top:0; width:auto; }}
     .error {{ color:#a31925; font-weight:700; }}
-    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools,.editor-actions,.comparison-grid {{ grid-template-columns:1fr; }} }}
+    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.rule-tools,.editor-actions,.comparison-grid,.review-controls {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
 <body>
@@ -343,6 +349,14 @@ const customRulesTemplate = `rules:
 function escapeHtml(value) {{
   return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
 }}
+const reviewLabels = {{
+  pending: 'Pendiente',
+  confirmed: 'Confirmado',
+  false_positive: 'Falso positivo',
+  accepted_risk: 'Riesgo aceptado',
+  fixed: 'Corregido',
+  revalidated: 'Revalidado'
+}};
 function renderRules() {{
   const q = document.getElementById('rule-search').value.toLowerCase();
   const severity = document.getElementById('rule-severity').value;
@@ -520,6 +534,35 @@ document.getElementById('custom-save').addEventListener('click', async () => {{
     customMessage('warning', error.message);
   }}
 }});
+async function saveReview(button) {{
+  const container = button.closest('.finding');
+  const payload = {{
+    review_path: button.dataset.reviewPath,
+    fingerprint: button.dataset.fingerprint,
+    rule_id: button.dataset.ruleId,
+    title: button.dataset.title,
+    file: button.dataset.file,
+    line: Number(button.dataset.line || 0),
+    status: container.querySelector('[data-review-status]').value,
+    reviewed_by: form.elements.auditor.value,
+    rationale: container.querySelector('[data-review-rationale]').value,
+    ticket: container.querySelector('[data-review-ticket]').value,
+    fix_commit: container.querySelector('[data-review-fix]').value,
+    verification: container.querySelector('[data-review-verification]').value
+  }};
+  const response = await fetch('/review', {{
+    method: 'POST',
+    headers: {{ 'Content-Type': 'application/json' }},
+    body: JSON.stringify(payload)
+  }});
+  const data = await response.json();
+  if (!response.ok) {{
+    alert(data.error || 'No se pudo guardar la validacion');
+    return;
+  }}
+  button.textContent = 'Guardado';
+  setTimeout(() => button.textContent = 'Guardar', 1200);
+}}
 form.addEventListener('submit', async (event) => {{
   event.preventDefault();
   button.disabled = true;
@@ -542,14 +585,33 @@ form.addEventListener('submit', async (event) => {{
     }});
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Error desconocido');
-    const preferred = ['Dashboard', 'Informe técnico HTML', 'Resumen PDF', 'Informe técnico MD', 'Hallazgos JSON', 'SARIF', 'Baseline', 'Checklist'];
+    const preferred = ['Dashboard', 'Informe técnico HTML', 'Resumen PDF', 'Informe técnico MD', 'Hallazgos JSON', 'SARIF', 'Baseline', 'Review', 'Checklist'];
     const links = preferred.filter(name => data.files[name]).map(name => `<a href="/artifact?path=${{encodeURIComponent(data.files[name])}}" target="_blank">${{name}}</a>`).join('');
     const warnings = (data.warnings || []).map(w => `<div class="warning">${{escapeHtml(w)}}</div>`).join('');
+    const reviewOptions = Object.entries(reviewLabels).map(([value, label]) => `<option value="${{value}}">${{label}}</option>`).join('');
     const findings = data.findings.slice(0, 10).map(f => `
       <div class="finding">
         <span class="badge ${{f.severity}}">${{f.severity}}</span>
         <strong>${{f.rule_id}} · ${{f.title}}</strong>
         <p><code>${{f.file}}:${{f.line}}</code> · CVSS ${{f.cvss}} · ${{f.category}}</p>
+        <p><strong>Validación humana:</strong> ${{reviewLabels[f.review?.status || 'pending']}}</p>
+        <div class="review-controls">
+          <select data-review-status>${{reviewOptions}}</select>
+          <input data-review-rationale placeholder="Motivo / evidencia manual" value="${{escapeHtml(f.review?.rationale || '')}}">
+          <input data-review-ticket placeholder="Ticket" value="${{escapeHtml(f.review?.ticket || '')}}">
+          <button type="button"
+            data-review-path="${{escapeHtml(data.review_path)}}"
+            data-fingerprint="${{escapeHtml(f.fingerprint)}}"
+            data-rule-id="${{escapeHtml(f.rule_id)}}"
+            data-title="${{escapeHtml(f.title)}}"
+            data-file="${{escapeHtml(f.file)}}"
+            data-line="${{escapeHtml(f.line)}}"
+            onclick="saveReview(this)">Guardar</button>
+        </div>
+        <div class="review-controls">
+          <input data-review-fix placeholder="Commit de fix" value="${{escapeHtml(f.review?.fix_commit || '')}}">
+          <input data-review-verification placeholder="Verificación" value="${{escapeHtml(f.review?.verification || '')}}">
+        </div>
       </div>`).join('');
     const comparison = data.comparison ? `
       <div class="comparison ${{data.comparison.status}}">
@@ -573,6 +635,7 @@ form.addEventListener('submit', async (event) => {{
       </div>
       ${{data.ollama ? `<p><strong>Ollama:</strong> reales=${{data.ollama.probable_real}} · revisión=${{data.ollama.requiere_revision}} · falsos positivos=${{data.ollama.probable_falso_positivo}}</p>` : ''}}
       ${{data.custom_rules ? `<p><strong>Reglas custom:</strong> ${{data.custom_rules}}</p>` : ''}}
+      <p><strong>Validación humana:</strong> pendientes=${{data.review_counts.pending}} · confirmados=${{data.review_counts.confirmed}} · falsos positivos=${{data.review_counts.false_positive}} · aceptados=${{data.review_counts.accepted_risk}} · corregidos=${{data.review_counts.fixed}} · revalidados=${{data.review_counts.revalidated}}</p>
       ${{comparison}}
       ${{warnings}}
       <p><strong>SHA256 proyecto:</strong> <code>${{data.project_sha256}}</code></p>
@@ -580,6 +643,10 @@ form.addEventListener('submit', async (event) => {{
       <h2>Hallazgos prioritarios</h2>
       ${{findings || '<p>Sin hallazgos.</p>'}}
     `;
+    document.querySelectorAll('[data-review-status]').forEach((select, index) => {{
+      const finding = data.findings[index];
+      if (finding?.review?.status) select.value = finding.review.status;
+    }});
   }} catch (error) {{
     result.innerHTML = `<p class="error">${{error.message}}</p>`;
   }} finally {{
@@ -674,6 +741,47 @@ def save_custom_rules_text(path_value: str, text: str) -> dict:
     return {"path": str(path), "count": len(rules), "rules": [rule.rule_id for rule in rules]}
 
 
+def save_review_decision(payload: dict) -> dict:
+    review_path = Path(payload.get("review_path", "")).expanduser().resolve()
+    if review_path.suffix.lower() != ".json":
+        raise ValueError("La validacion humana debe guardarse en un archivo JSON.")
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    records = preauditor.load_review_records(review_path)
+    fingerprint = str(payload.get("fingerprint", "")).strip()
+    if not fingerprint:
+        raise ValueError("Falta fingerprint del hallazgo.")
+    record = preauditor.normalize_review_record(
+        {
+            "fingerprint": fingerprint,
+            "status": payload.get("status", "pending"),
+            "reviewed_by": payload.get("reviewed_by", ""),
+            "reviewed_at": utc_timestamp(),
+            "rationale": payload.get("rationale", ""),
+            "ticket": payload.get("ticket", ""),
+            "fix_commit": payload.get("fix_commit", ""),
+            "verification": payload.get("verification", ""),
+            "rule_id": payload.get("rule_id", ""),
+            "title": payload.get("title", ""),
+            "file": payload.get("file", ""),
+            "line": payload.get("line", 0),
+        }
+    )
+    records[fingerprint] = record
+    review_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "updated_at": utc_timestamp(),
+                "reviews": list(records.values()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return {"path": str(review_path), "record": record}
+
+
 def scan_project(payload: dict) -> dict:
     target = Path(payload.get("target", "")).expanduser().resolve()
     if not target.exists() or not target.is_dir():
@@ -728,7 +836,9 @@ def scan_project(payload: dict) -> dict:
         "SARIF": output_dir / "hallazgos.sarif",
         "Baseline": output_dir / "baseline.json",
         "Checklist": output_dir / "checklist-remediacion.md",
+        "Review": output_dir / "review.json",
     }
+    review_records = preauditor.load_review_records(files["Review"])
     compare_value = payload.get("compare_baseline", "").strip()
     compare_path = Path(compare_value).expanduser().resolve() if compare_value else None
     auto_compare = bool(payload.get("auto_compare"))
@@ -744,6 +854,7 @@ def scan_project(payload: dict) -> dict:
         project_sha,
         comparison=comparison,
         ollama_assessments=ollama_assessments,
+        review_records=review_records,
     )
     pdf_written = preauditor.write_report(
         markdown,
@@ -758,6 +869,7 @@ def scan_project(payload: dict) -> dict:
         project_sha,
         comparison=comparison,
         ollama_assessments=ollama_assessments,
+        review_records=review_records,
     )
     preauditor.write_json(
         findings,
@@ -767,12 +879,26 @@ def scan_project(payload: dict) -> dict:
         project_sha,
         comparison=comparison,
         ollama_assessments=ollama_assessments,
+        review_records=review_records,
     )
     preauditor.write_sarif(findings, files["SARIF"])
     files["Baseline"].write_text(
-        json.dumps(preauditor.baseline_payload(findings, target, profile, meta, project_sha), ensure_ascii=False, indent=2),
+        json.dumps(preauditor.baseline_payload(findings, target, profile, meta, project_sha, review_records), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    if not files["Review"].exists():
+        files["Review"].write_text(
+            json.dumps(
+                {
+                    "schema_version": "1.0",
+                    "updated_at": utc_timestamp(),
+                    "reviews": [],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
     preauditor.write_checklist(findings, files["Checklist"])
     ai_score, ai_level, ai_reasons = preauditor.ai_agent_risk_score(findings)
     ollama_counts = None
@@ -794,9 +920,11 @@ def scan_project(payload: dict) -> dict:
         "ollama": ollama_counts,
         "custom_rules": len(custom_rules),
         "comparison": comparison,
+        "review_counts": preauditor.review_counts(findings, review_records),
+        "review_path": str(files["Review"]),
         "warnings": warnings,
         "files": existing_files,
-        "findings": [preauditor.asdict(finding) for finding in findings],
+        "findings": [preauditor.finding_payload(finding, review_records) for finding in findings],
     }
 
 
@@ -862,7 +990,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self) -> None:
-        if self.path not in {"/scan", "/custom-rules/validate", "/custom-rules/save"}:
+        if self.path not in {"/scan", "/custom-rules/validate", "/custom-rules/save", "/review"}:
             self.send_error(404)
             return
         try:
@@ -873,8 +1001,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/custom-rules/validate":
                 rules = validate_custom_rules_text(payload.get("text", ""))
                 response = {"count": len(rules), "rules": [rule.rule_id for rule in rules]}
-            else:
+            elif self.path == "/custom-rules/save":
                 response = save_custom_rules_text(payload.get("path", ""), payload.get("text", ""))
+            else:
+                response = save_review_decision(payload)
             body = json.dumps(response, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")

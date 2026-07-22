@@ -105,6 +105,7 @@ Desde esa pantalla puedes:
 - seleccionar perfil y stack
 - rellenar cliente, auditor, alcance y version
 - comparar contra un `baseline.json` anterior para ver antes/despues
+- marcar validacion humana persistente en `review.json`
 - activar triage local con Ollama si lo tienes arrancado
 - generar el pack completo de entrega
 - abrir informe, PDF, dashboard, JSON, SARIF, baseline y checklist
@@ -301,6 +302,32 @@ En la UI local, la opcion `Comparar con baseline anterior de la carpeta de salid
 4. Revisar la tarjeta `Comparativa antes/despues` en la UI y en el dashboard.
 
 Esto permite demostrar progreso: hallazgos nuevos, corregidos, persistentes y porcentaje de mejora.
+
+## Validacion humana persistente
+
+La herramienta diferencia entre deteccion automatica, triage opcional con Ollama y validacion humana. La decision humana se guarda en `review.json`, indexada por fingerprint del hallazgo.
+
+Estados disponibles:
+
+- `pending`: pendiente de revisar.
+- `confirmed`: confirmado manualmente.
+- `false_positive`: falso positivo.
+- `accepted_risk`: riesgo aceptado.
+- `fixed`: corregido.
+- `revalidated`: revalidado tras correccion.
+
+El archivo `review.json` conserva:
+
+- fingerprint
+- estado
+- revisor
+- fecha de revision
+- razonamiento
+- ticket
+- commit de correccion
+- evidencia de verificacion
+
+Ollama no modifica estos estados. Solo aporta triage auxiliar; el veredicto humano queda separado y persistente.
 
 ## Triage local con Ollama
 

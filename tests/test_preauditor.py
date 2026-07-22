@@ -262,6 +262,72 @@ rules:
         self.assertIsNotNone(second["comparison"])
         self.assertGreaterEqual(second["comparison"]["fixed"], 1)
 
+    def test_review_records_are_applied_to_findings(self):
+        findings = self.scan_fixture(
+            {
+                "app.py": 'API_KEY = "demo_api_key_not_real_1234567890"\n',
+            },
+            profile="basic",
+        )
+        finding = findings[0]
+        reviews = {
+            finding.fingerprint: {
+                "fingerprint": finding.fingerprint,
+                "status": "confirmed",
+                "reviewed_by": "Francisco",
+                "rationale": "Confirmado manualmente",
+            }
+        }
+        payload = preauditor.finding_payload(finding, reviews)
+        counts = preauditor.review_counts(findings, reviews)
+        self.assertEqual(payload["review"]["status"], "confirmed")
+        self.assertEqual(counts["confirmed"], 1)
+        self.assertEqual(counts["pending"], 0)
+
+    def test_ui_review_decision_persists_between_scans(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "project"
+            output = Path(tmp) / "out"
+            root.mkdir()
+            output.mkdir()
+            (root / "app.py").write_text('API_KEY = "demo_api_key_not_real_1234567890"\n', encoding="utf-8")
+            first = preauditor_ui.scan_project(
+                {
+                    "target": str(root),
+                    "output_dir": str(output),
+                    "profile": "basic",
+                    "stack": "generic",
+                    "client": "Demo",
+                }
+            )
+            finding = first["findings"][0]
+            saved = preauditor_ui.save_review_decision(
+                {
+                    "review_path": first["review_path"],
+                    "fingerprint": finding["fingerprint"],
+                    "rule_id": finding["rule_id"],
+                    "title": finding["title"],
+                    "file": finding["file"],
+                    "line": finding["line"],
+                    "status": "confirmed",
+                    "reviewed_by": "Francisco",
+                    "rationale": "Validado en prueba",
+                    "ticket": "SEC-1",
+                }
+            )
+            second = preauditor_ui.scan_project(
+                {
+                    "target": str(root),
+                    "output_dir": str(output),
+                    "profile": "basic",
+                    "stack": "generic",
+                    "client": "Demo",
+                }
+            )
+        self.assertEqual(saved["record"]["status"], "confirmed")
+        self.assertEqual(second["findings"][0]["review"]["status"], "confirmed")
+        self.assertEqual(second["review_counts"]["confirmed"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

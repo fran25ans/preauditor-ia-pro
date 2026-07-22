@@ -34,6 +34,15 @@ SEVERITY_LABELS = {
     "Baja": "Baja",
 }
 
+REVIEW_STATUSES = {
+    "pending": "Pendiente",
+    "confirmed": "Confirmado manualmente",
+    "false_positive": "Falso positivo",
+    "accepted_risk": "Riesgo aceptado",
+    "fixed": "Corregido",
+    "revalidated": "Revalidado",
+}
+
 PROFILES = {
     "basic": {
         "SEC-001",
@@ -2600,7 +2609,84 @@ def finding_key(finding: Finding) -> str:
     return f"{finding.rule_id}:{finding.file}:{finding.line}:{finding.fingerprint}"
 
 
-def baseline_payload(findings: list[Finding], target: Path, profile: str, meta: ReportMeta, project_sha: str) -> dict:
+def load_review_records(path: Path | None) -> dict[str, dict]:
+    if not path or not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    raw_items = data.get("reviews", data) if isinstance(data, dict) else data
+    records: dict[str, dict] = {}
+    if isinstance(raw_items, list):
+        for item in raw_items:
+            if isinstance(item, dict) and item.get("fingerprint"):
+                records[str(item["fingerprint"])] = item
+    elif isinstance(raw_items, dict):
+        for fingerprint, item in raw_items.items():
+            if isinstance(item, dict):
+                normalized = dict(item)
+                normalized.setdefault("fingerprint", fingerprint)
+                records[str(fingerprint)] = normalized
+    return records
+
+
+def normalize_review_record(record: dict | None, finding: Finding | None = None) -> dict:
+    record = dict(record or {})
+    status = str(record.get("status", "pending"))
+    if status not in REVIEW_STATUSES:
+        status = "pending"
+    normalized = {
+        "fingerprint": str(record.get("fingerprint") or (finding.fingerprint if finding else "")),
+        "status": status,
+        "reviewed_by": str(record.get("reviewed_by", "")),
+        "reviewed_at": str(record.get("reviewed_at", "")),
+        "rationale": str(record.get("rationale", "")),
+        "ticket": str(record.get("ticket", "")),
+        "fix_commit": str(record.get("fix_commit", "")),
+        "verification": str(record.get("verification", "")),
+    }
+    if finding:
+        normalized.update(
+            {
+                "rule_id": finding.rule_id,
+                "title": finding.title,
+                "file": finding.file,
+                "line": finding.line,
+            }
+        )
+    else:
+        for key in ("rule_id", "title", "file", "line"):
+            if key in record:
+                normalized[key] = record[key]
+    return normalized
+
+
+def review_for_finding(finding: Finding, review_records: dict[str, dict] | None = None) -> dict:
+    return normalize_review_record((review_records or {}).get(finding.fingerprint), finding)
+
+
+def review_counts(findings: list[Finding], review_records: dict[str, dict] | None = None) -> dict[str, int]:
+    counts = {status: 0 for status in REVIEW_STATUSES}
+    for finding in findings:
+        counts[review_for_finding(finding, review_records)["status"]] += 1
+    return counts
+
+
+def finding_payload(finding: Finding, review_records: dict[str, dict] | None = None) -> dict:
+    payload = asdict(finding)
+    payload["review"] = review_for_finding(finding, review_records)
+    return payload
+
+
+def baseline_payload(
+    findings: list[Finding],
+    target: Path,
+    profile: str,
+    meta: ReportMeta,
+    project_sha: str,
+    review_records: dict[str, dict] | None = None,
+) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "target": str(target),
@@ -2616,6 +2702,7 @@ def baseline_payload(findings: list[Finding], target: Path, profile: str, meta: 
                 "file": finding.file,
                 "line": finding.line,
                 "fingerprint": finding.fingerprint,
+                "review": review_for_finding(finding, review_records),
             }
             for finding in findings
         ],
@@ -2878,6 +2965,7 @@ def render_markdown(
     project_sha: str = "",
     comparison: dict | None = None,
     ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
 ) -> str:
     counts = severity_counts(findings)
     categories = category_counts(findings)
@@ -2968,6 +3056,20 @@ def render_markdown(
         )
 
     validation_points = manual_validation_points(findings)
+    reviews = review_counts(findings, review_records)
+    lines.extend(
+        [
+            "### Validacion humana persistente",
+            "",
+            f"- Pendientes: {reviews['pending']}",
+            f"- Confirmados manualmente: {reviews['confirmed']}",
+            f"- Falsos positivos: {reviews['false_positive']}",
+            f"- Riesgos aceptados: {reviews['accepted_risk']}",
+            f"- Corregidos: {reviews['fixed']}",
+            f"- Revalidados: {reviews['revalidated']}",
+            "",
+        ]
+    )
     if validation_points:
         lines.extend(["### Puntos que requieren validacion manual", ""])
         for point in validation_points:
@@ -3055,6 +3157,7 @@ def render_markdown(
                 f"- **Archivo:** `{finding.file}:{finding.line}`",
                 f"- **Fingerprint:** `{finding.fingerprint}`",
                 f"- **Evidencia:** `{finding.evidence}`",
+                f"- **Validacion humana:** {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}",
                 "",
             ]
         )
@@ -3128,7 +3231,16 @@ def badge_class(severity: str) -> str:
     }[severity]
 
 
-def render_html(findings: list[Finding], target: Path, profile: str, meta: ReportMeta, project_sha: str = "", comparison: dict | None = None, ollama_assessments: dict[str, dict] | None = None) -> str:
+def render_html(
+    findings: list[Finding],
+    target: Path,
+    profile: str,
+    meta: ReportMeta,
+    project_sha: str = "",
+    comparison: dict | None = None,
+    ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
+) -> str:
     counts = severity_counts(findings)
     categories = category_counts(findings)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -3167,6 +3279,13 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
     </section>
 """
     manual_html = "".join(f"<li>{html.escape(point)}</li>" for point in manual_validation_points(findings))
+    review_summary = review_counts(findings, review_records)
+    review_html = f"""
+    <section class="panel">
+      <h2>Validacion humana persistente</h2>
+      <p><strong>Pendientes:</strong> {review_summary['pending']} · <strong>Confirmados:</strong> {review_summary['confirmed']} · <strong>Falsos positivos:</strong> {review_summary['false_positive']} · <strong>Riesgos aceptados:</strong> {review_summary['accepted_risk']} · <strong>Corregidos:</strong> {review_summary['fixed']} · <strong>Revalidados:</strong> {review_summary['revalidated']}</p>
+    </section>
+"""
     ollama_html = ""
     if ollama_assessments:
         verdict_counts: dict[str, int] = {}
@@ -3202,6 +3321,7 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
           <div><span>Confianza</span><strong>{html.escape(finding.confidence)}</strong></div>
           <div><span>Esfuerzo</span><strong>{html.escape(finding.remediation_effort)}</strong></div>
           <div><span>SLA sugerido</span><strong>{html.escape(remediation_sla(finding))}</strong></div>
+          <div><span>Validacion humana</span><strong>{html.escape(REVIEW_STATUSES[review_for_finding(finding, review_records)['status']])}</strong></div>
         </div>
         {related_findings_html(finding)}
         <pre>{html.escape(finding.context)}</pre>
@@ -3272,7 +3392,7 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
     .scorebox {{ min-width: 120px; text-align: right; }}
     .scorebox strong {{ display: block; font-size: 28px; margin-top: 8px; }}
     .scorebox span:last-child {{ color: var(--muted); font-size: 12px; }}
-    .meta-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }}
+    .meta-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }}
     .meta-grid div {{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }}
     .meta-grid span {{ display: block; color: var(--muted); font-size: 12px; }}
     .related-findings {{ border: 1px solid #f2b8bd; background: #fff7f8; border-radius: 8px; padding: 12px; margin-top: 16px; }}
@@ -3326,6 +3446,7 @@ def render_html(findings: list[Finding], target: Path, profile: str, meta: Repor
     </section>
     {comparison_html}
     {ollama_html}
+    {review_html}
     <section class="panel">
       <h2>Puntos que requieren validacion manual</h2>
       <ul>{manual_html or '<li>Validar manualmente hallazgos criticos y altos.</li>'}</ul>
@@ -3375,6 +3496,7 @@ def render_dashboard(
     project_sha: str = "",
     comparison: dict | None = None,
     ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
 ) -> str:
     ai_score, ai_level, ai_reasons = ai_agent_risk_score(findings)
     payload = json.dumps(
@@ -3385,12 +3507,13 @@ def render_dashboard(
             "project_sha256": project_sha,
             "comparison": comparison,
             "ollama_triage": ollama_assessments or {},
+            "review_counts": review_counts(findings, review_records),
             "ai_agent_risk": {"score": ai_score, "level": ai_level, "reasons": ai_reasons},
             "risk": global_risk(findings),
             "counts": severity_counts(findings),
             "categories": category_counts(findings),
             "average_cvss": average_cvss(findings),
-            "findings": [asdict(finding) for finding in findings],
+            "findings": [finding_payload(finding, review_records) for finding in findings],
         },
         ensure_ascii=False,
     )
@@ -3593,6 +3716,7 @@ def render_dashboard(
           </div>
           ${{relatedRows(f)}}
           <pre>${{esc(f.context)}}</pre>
+          <p><strong>Validacion humana:</strong> ${{esc(f.review?.status || 'pending')}} ${{f.review?.reviewed_by ? '· ' + esc(f.review.reviewed_by) : ''}}</p>
           ${{data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`] ? `<p><strong>Ollama:</strong> ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].verdict)}} · ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].confidence)}}. ${{esc(data.ollama_triage[`${{f.rule_id}}:${{f.file}}:${{f.line}}:${{f.fingerprint}}`].rationale)}}</p>` : ''}}
           <p><strong>Riesgo:</strong> ${{esc(f.why_dangerous)}}</p>
           <p><strong>Correccion:</strong> ${{esc(f.recommendation)}}</p>
@@ -3616,6 +3740,7 @@ def write_pdf_report(
     project_sha: str = "",
     comparison: dict | None = None,
     ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
 ) -> bool:
     try:
         from reportlab.lib import colors
@@ -3676,6 +3801,16 @@ def write_pdf_report(
         story.append(p("Comparativa contra baseline", "Heading1"))
         story.append(p(f"Nuevos: {comparison['new']} · Corregidos: {comparison['fixed']} · Persistentes: {comparison['persistent']}"))
         story.append(Spacer(1, 12))
+    reviews = review_counts(findings, review_records)
+    story.append(p("Validacion humana persistente", "Heading1"))
+    story.append(
+        p(
+            f"Pendientes: {reviews['pending']} · Confirmados: {reviews['confirmed']} · "
+            f"Falsos positivos: {reviews['false_positive']} · Riesgos aceptados: {reviews['accepted_risk']} · "
+            f"Corregidos: {reviews['fixed']} · Revalidados: {reviews['revalidated']}"
+        )
+    )
+    story.append(Spacer(1, 12))
     if ollama_assessments:
         verdict_counts: dict[str, int] = {}
         for assessment in ollama_assessments.values():
@@ -3715,6 +3850,7 @@ def write_pdf_report(
     for finding in findings:
         story.append(p(f"{finding.rule_id} · {finding.title}", "Heading2"))
         story.append(p(f"Severidad: {finding.severity} · CVSS: {finding.cvss} · Categoria: {finding.category} · Ubicacion: {finding.file}:{finding.line}"))
+        story.append(p(f"Validacion humana: {REVIEW_STATUSES[review_for_finding(finding, review_records)['status']]}"))
         if finding.related_findings:
             story.append(p("Hallazgo compuesto: la severidad procede de la combinacion de varias evidencias relacionadas."))
             for item in finding.related_findings:
@@ -3760,19 +3896,20 @@ def write_report(
     project_sha: str = "",
     comparison: dict | None = None,
     ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
 ) -> bool:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(markdown, encoding="utf-8")
-    html_content = render_html(findings, target, profile, meta, project_sha, comparison, ollama_assessments)
+    html_content = render_html(findings, target, profile, meta, project_sha, comparison, ollama_assessments, review_records)
     if html_output:
         html_output.parent.mkdir(parents=True, exist_ok=True)
         html_output.write_text(html_content, encoding="utf-8")
     pdf_written = False
     if pdf_output:
-        pdf_written = write_pdf_report(findings, target, profile, meta, pdf_output, project_sha, comparison, ollama_assessments)
+        pdf_written = write_pdf_report(findings, target, profile, meta, pdf_output, project_sha, comparison, ollama_assessments, review_records)
     if dashboard_output:
         dashboard_output.parent.mkdir(parents=True, exist_ok=True)
-        dashboard_output.write_text(render_dashboard(findings, target, profile, meta, project_sha, comparison, ollama_assessments), encoding="utf-8")
+        dashboard_output.write_text(render_dashboard(findings, target, profile, meta, project_sha, comparison, ollama_assessments, review_records), encoding="utf-8")
     return pdf_written
 
 
@@ -3784,6 +3921,7 @@ def write_json(
     project_sha: str = "",
     comparison: dict | None = None,
     ollama_assessments: dict[str, dict] | None = None,
+    review_records: dict[str, dict] | None = None,
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -3793,6 +3931,7 @@ def write_json(
         "project_sha256": project_sha,
         "comparison": comparison,
         "ollama_triage": ollama_assessments or {},
+        "review_counts": review_counts(findings, review_records),
         "ai_agent_risk": {
             "score": ai_agent_risk_score(findings)[0],
             "level": ai_agent_risk_score(findings)[1],
@@ -3802,7 +3941,7 @@ def write_json(
         "average_cvss": average_cvss(findings),
         "counts": severity_counts(findings),
         "categories": category_counts(findings),
-        "findings": [asdict(finding) for finding in findings],
+        "findings": [finding_payload(finding, review_records) for finding in findings],
     }
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
