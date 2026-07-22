@@ -13,10 +13,10 @@ Pre-Auditor IA Pro instala dos comandos locales:
 
 ### Instalación rápida recomendada
 
-Instala el wheel publicado en la release `v0.1.0`:
+Instala el wheel publicado en la release `v0.2.0`:
 
 ```bash
-python3 -m pip install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
+python3 -m pip install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.2.0/preauditor_ia-0.2.0-py3-none-any.whl"
 ```
 
 Comprueba la instalación:
@@ -29,7 +29,7 @@ preauditor-ui
 Página de la release:
 
 ```text
-https://github.com/fran25ans/preauditor-ia-pro/releases/tag/v0.1.0
+https://github.com/fran25ans/preauditor-ia-pro/releases/tag/v0.2.0
 ```
 
 ### Instalación aislada con pipx
@@ -38,7 +38,7 @@ Recomendado si quieres usarlo como herramienta de línea de comandos sin mezclar
 
 ```bash
 python3 -m pip install pipx
-python3 -m pipx install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
+python3 -m pipx install "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.2.0/preauditor_ia-0.2.0-py3-none-any.whl"
 ```
 
 ### Desde el tag de GitHub
@@ -46,7 +46,7 @@ python3 -m pipx install "https://github.com/fran25ans/preauditor-ia-pro/releases
 Instala directamente una versión concreta del repositorio:
 
 ```bash
-python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v0.1.0"
+python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v0.2.0"
 ```
 
 ### Desde un wheel local
@@ -54,13 +54,13 @@ python3 -m pip install "git+https://github.com/fran25ans/preauditor-ia-pro.git@v
 Si ya tienes el archivo `.whl` descargado:
 
 ```bash
-python3 -m pip install preauditor_ia-0.1.0-py3-none-any.whl
+python3 -m pip install preauditor_ia-0.2.0-py3-none-any.whl
 ```
 
 O, si estás dentro del proyecto y tienes el wheel generado en `dist/`:
 
 ```bash
-python3 -m pip install dist/preauditor_ia-0.1.0-py3-none-any.whl
+python3 -m pip install dist/preauditor_ia-0.2.0-py3-none-any.whl
 ```
 
 ### Desde el código fuente
@@ -82,7 +82,7 @@ sh install.sh
 Si ya tenías una versión previa instalada y quieres reinstalar:
 
 ```bash
-python3 -m pip install --force-reinstall "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.1.0/preauditor_ia-0.1.0-py3-none-any.whl"
+python3 -m pip install --force-reinstall "https://github.com/fran25ans/preauditor-ia-pro/releases/download/v0.2.0/preauditor_ia-0.2.0-py3-none-any.whl"
 ```
 
 ## Interfaz web local
@@ -124,7 +124,7 @@ La interfaz web está pensada para uso local del equipo, no como servicio públi
 Controles aplicados:
 
 - escucha en `127.0.0.1` por defecto
-- rechaza arrancar fuera de loopback salvo `--allow-remote`
+- rechaza siempre arrancar fuera de loopback
 - token aleatorio por sesión para operaciones `POST`
 - validación de `Host` y `Origin`
 - peticiones `POST` solo con `Content-Type: application/json`
@@ -133,7 +133,7 @@ Controles aplicados:
 - los artefactos se sirven solo desde carpetas de entrega generadas por la herramienta
 - las escrituras fuera de la carpeta de trabajo requieren confirmación explícita en la UI
 
-No abras la UI en `0.0.0.0` ni la expongas a redes compartidas salvo que entiendas el riesgo y controles el entorno.
+La UI no admite escucha remota. Si necesitas compartir resultados, distribuye los artefactos generados en lugar de exponer el proceso local.
 
 ### Ejecución en terminal / interfaz local
 
@@ -341,6 +341,8 @@ En la UI local, la opción `Comparar con baseline anterior de la carpeta de sali
 
 Esto permite demostrar progreso: hallazgos nuevos, corregidos, persistentes y porcentaje de mejora.
 
+Puedes reproducir un ejemplo completo con resultados medidos en [el caso práctico antes/después](docs/case-study-before-after.md).
+
 ## Validación humana persistente
 
 La herramienta diferencia entre detección automática, triage opcional con Ollama y validación humana. La decisión humana se guarda en `review.json`, indexada por fingerprint del hallazgo.
@@ -488,7 +490,7 @@ Los tests no auditan un proyecto: verifican que el propio motor sigue detectando
 python3 -m unittest discover -s tests
 ```
 
-Cubren secretos, workflows IA, hallazgos compuestos, perfiles, supresiones y metadatos del informe.
+Cubren secretos, workflows IA, hallazgos compuestos, persistencia e invalidación de revisiones, seguridad de la UI local, perfiles, supresiones y metadatos del informe. GitHub Actions ejecuta la suite en Python 3.10, 3.11 y 3.12 en cada push y pull request.
 
 Las pruebas de Ollama no llaman al modelo real: verifican el parseo de JSON y el filtro explícito de falsos positivos para que la suite siga siendo rápida y reproducible.
 

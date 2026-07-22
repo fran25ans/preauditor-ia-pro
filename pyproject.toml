@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "preauditor-ia"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pre-auditor local de seguridad para APIs, CI/CD, cloud e integraciones de IA."
 readme = "README.md"
 requires-python = ">=3.10"

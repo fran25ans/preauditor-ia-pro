@@ -1,3 +1,5 @@
+import contextlib
+import io
 import tempfile
 import threading
 import unittest
@@ -78,6 +80,48 @@ class PreauditorRuleTests(unittest.TestCase):
         self.assertEqual([item["line"] for item in composite.related_findings], [3, 4])
         self.assertIn("allow_origins", composite.related_findings[0]["evidence"])
         self.assertIn("allow_credentials", composite.related_findings[1]["evidence"])
+
+    def test_composite_review_is_invalidated_when_evidence_changes(self):
+        first = self.scan_fixture(
+            {
+                "app.py": "allow_origins=['*']\nallow_credentials=True\n",
+            }
+        )
+        changed = self.scan_fixture(
+            {
+                "app.py": "# configuration moved\n\nallow_origins=['*']\nallow_credentials=True\n",
+            }
+        )
+        first_composite = next(f for f in first if f.rule_id == "CMP-002")
+        changed_composite = next(f for f in changed if f.rule_id == "CMP-002")
+        reviews = {
+            first_composite.fingerprint: {
+                "fingerprint": first_composite.fingerprint,
+                "status": "false_positive",
+                "rationale": "Reviewed before the evidence changed",
+            }
+        }
+
+        self.assertNotEqual(first_composite.fingerprint, changed_composite.fingerprint)
+        self.assertEqual(preauditor.review_for_finding(changed_composite, reviews)["status"], "pending")
+
+    def test_composite_review_persists_when_evidence_is_unchanged(self):
+        findings = self.scan_fixture(
+            {
+                "app.py": "allow_origins=['*']\nallow_credentials=True\n",
+            }
+        )
+        repeated = self.scan_fixture(
+            {
+                "app.py": "allow_origins=['*']\nallow_credentials=True\n",
+            }
+        )
+        original = next(f for f in findings if f.rule_id == "CMP-002")
+        unchanged = next(f for f in repeated if f.rule_id == "CMP-002")
+        reviews = {original.fingerprint: {"fingerprint": original.fingerprint, "status": "confirmed"}}
+
+        self.assertEqual(original.fingerprint, unchanged.fingerprint)
+        self.assertEqual(preauditor.review_for_finding(unchanged, reviews)["status"], "confirmed")
 
     def test_detects_ai_pr_composite(self):
         findings = self.scan_fixture(
@@ -423,6 +467,16 @@ rules:
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_ui_cli_rejects_remote_mode(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                preauditor_ui.parse_args(["--host", "0.0.0.0", "--allow-remote"])
+
+    def test_ui_cli_keeps_loopback_mode(self):
+        args = preauditor_ui.parse_args(["--host", "127.0.0.1", "--port", "9876"])
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertEqual(args.port, 9876)
 
 
 if __name__ == "__main__":

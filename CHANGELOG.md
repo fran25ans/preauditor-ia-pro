@@ -1,0 +1,12 @@
+# Changelog
+
+## 0.2.0
+
+- Añade validación humana persistente mediante `review.json`.
+- Añade comparación automática antes/después con baseline.
+- Añade evidencia relacionada y fingerprints vinculados a los constituyentes de hallazgos compuestos.
+- Endurece la UI local y elimina la posibilidad de escuchar fuera de loopback.
+- Añade interfaz e informes en inglés.
+- Mejora el posicionamiento y la redacción en español.
+- Añade CI para Python 3.10, 3.11 y 3.12.
+- Añade un caso práctico reproducible antes/después.

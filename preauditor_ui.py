@@ -1486,19 +1486,18 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Interfaz web local de Pre-Auditor IA Pro.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--open", action="store_true", help="Abrir automáticamente en el navegador.")
-    parser.add_argument("--allow-remote", action="store_true", help="Permite escuchar fuera de loopback. Uso no recomendado.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> int:
     args = parse_args()
-    if not args.allow_remote and not is_loopback_bind(args.host):
-        print("Por seguridad, la UI solo escucha en loopback. Usa --allow-remote si entiendes el riesgo.")
+    if not is_loopback_bind(args.host):
+        print("Por seguridad, la UI solo puede escuchar en loopback.")
         return 2
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"

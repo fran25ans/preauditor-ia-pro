@@ -2780,6 +2780,7 @@ def related_finding_entry(finding: Finding) -> dict[str, object]:
         "file": finding.file,
         "line": finding.line,
         "evidence": finding.evidence,
+        "fingerprint": finding.fingerprint,
     }
 
 
@@ -2800,6 +2801,24 @@ def composite_context(related: tuple[dict[str, object], ...]) -> str:
     )
 
 
+def composite_fingerprint(rule_id: str, file: str, related: tuple[dict[str, object], ...]) -> str:
+    material = {
+        "rule_id": rule_id,
+        "file": file,
+        "constituents": [
+            {
+                "rule_id": item["rule_id"],
+                "file": item["file"],
+                "line": item["line"],
+                "fingerprint": item["fingerprint"],
+            }
+            for item in related
+        ],
+    }
+    canonical = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:12]
+
+
 def add_composite_findings(findings: list[Finding]) -> list[Finding]:
     composites: list[Finding] = []
     by_file = sorted({finding.file for finding in findings})
@@ -2810,7 +2829,7 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
         if {"SEC-026", "SEC-027"} <= rule_ids and rule_ids.intersection({"SEC-005", "SEC-029", "SEC-058", "SEC-059"}):
             related = composite_related(file_findings, {"SEC-005", "SEC-026", "SEC-027", "SEC-029", "SEC-058", "SEC-059"})
             first_line = min(int(item["line"]) for item in related)
-            fingerprint = hashlib.sha256(f"CMP-001:{file}".encode()).hexdigest()[:12]
+            fingerprint = composite_fingerprint("CMP-001", file, related)
             composites.append(
                 Finding(
                     rule_id="CMP-001",
@@ -2838,7 +2857,7 @@ def add_composite_findings(findings: list[Finding]) -> list[Finding]:
         if {"SEC-003", "SEC-053"} <= rule_ids:
             related = composite_related(file_findings, {"SEC-003", "SEC-053"})
             first_line = min(int(item["line"]) for item in related)
-            fingerprint = hashlib.sha256(f"CMP-002:{file}".encode()).hexdigest()[:12]
+            fingerprint = composite_fingerprint("CMP-002", file, related)
             composites.append(
                 Finding(
                     rule_id="CMP-002",
