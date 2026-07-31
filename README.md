@@ -10,6 +10,7 @@ Pre-Auditor IA Pro instala dos comandos locales:
 
 - `preauditor`
 - `preauditor-ui`
+- `mobile-release-radar`
 
 ### Instalación rápida recomendada
 
@@ -138,6 +139,74 @@ La UI no admite escucha remota. Si necesitas compartir resultados, distribuye lo
 ### Ejecución en terminal / interfaz local
 
 ![Ejecución local de Pre-Auditor IA Pro](docs/assets/terminalweb.png)
+
+## Mobile Release Radar
+
+El paquete incluye también `mobile-release-radar`, una herramienta complementaria para revisar artefactos móviles antes de publicar una release.
+
+No analiza únicamente “si una app tiene vulnerabilidades”. Su foco es responder:
+
+> Qué riesgo introduce esta build respecto a la versión anterior.
+
+Soporta:
+
+- Android: `.apk` y `.aab`
+- iOS: `.ipa`
+
+Detecta señales como:
+
+- permisos Android nuevos o peligrosos
+- componentes Android exportados
+- `debuggable`, `allowBackup` y cleartext traffic
+- excepciones ATS en iOS
+- permisos sensibles declarados en `Info.plist`
+- URL schemes iOS
+- dominios y endpoints embebidos
+- secretos o tokens empaquetados
+- patrones inseguros de TLS y WebView
+- hallazgos nuevos, corregidos y persistentes entre dos builds
+
+### Analizar una build móvil
+
+```bash
+mobile-release-radar ./app-release.apk \
+  --out mobile-report.md \
+  --html mobile-report.html \
+  --json mobile-report.json
+```
+
+Para iOS:
+
+```bash
+mobile-release-radar ./App.ipa \
+  --out ios-report.md \
+  --html ios-report.html \
+  --json ios-report.json
+```
+
+### Comparar la build actual contra la anterior
+
+```bash
+mobile-release-radar ./app-86.apk \
+  --previous ./app-85.apk \
+  --out release-diff.md \
+  --html release-diff.html \
+  --json release-diff.json
+```
+
+La salida indica:
+
+- `APPROVED`: no hay indicadores bloqueantes relevantes.
+- `NEEDS_REVIEW`: hay cambios o riesgos que requieren revisión antes de publicar.
+- `BLOCKED`: hay hallazgos críticos o demasiados riesgos nuevos.
+
+Ejemplo de uso en CI:
+
+```bash
+mobile-release-radar ./app-release.apk --previous ./previous.apk --fail-on needs_review
+```
+
+`mobile-release-radar` es una comprobación preliminar de release. No sustituye una revisión móvil experta ni herramientas especializadas como MobSF; puede complementarlas y centrarse en el diferencial diario de la build.
 
 ## Qué detecta
 

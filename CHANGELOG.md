@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Añade `mobile-release-radar`, una herramienta para analizar y comparar releases móviles Android (`.apk`, `.aab`) e iOS (`.ipa`).
+- Detecta permisos, componentes exportados, configuraciones móviles inseguras, dominios, endpoints, secretos y cambios entre builds.
+- Genera decisión preliminar de release: `APPROVED`, `NEEDS_REVIEW` o `BLOCKED`.
+
 ## 0.2.0
 
 - Añade validación humana persistente mediante `review.json`.

@@ -1,13 +1,16 @@
 import contextlib
 import io
+import plistlib
 import tempfile
 import threading
 import unittest
+import zipfile
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
+import mobile_release_radar
 import preauditor
 import preauditor_ui
 
@@ -216,6 +219,24 @@ class PreauditorRuleTests(unittest.TestCase):
         self.assertIn("Remediation Checklist", checklist_text)
         self.assertIn("Possible exposed secret or API key", json_text)
         self.assertIn("Possible exposed secret or API key", sarif_text)
+
+    def test_dashboard_reserves_space_for_long_file_labels(self):
+        findings = self.scan_fixture(
+            {
+                ".github/workflows/deploy.yml": "permissions: write-all\n",
+            }
+        )
+        meta = preauditor.ReportMeta(
+            client="Demo",
+            auditor="Auditor",
+            scope="Dashboard layout",
+            version="test",
+        )
+        dashboard = preauditor.render_dashboard(findings, Path("/tmp/project"), "pro", meta)
+
+        self.assertIn("grid-template-columns:minmax(0,42%) minmax(80px,1fr) 32px", dashboard)
+        self.assertIn('class="bar-label" title="${esc(label)}"', dashboard)
+        self.assertIn("text-overflow:ellipsis", dashboard)
 
     def test_ui_home_includes_english_toggle_assets(self):
         html_text = preauditor_ui.render_home().decode("utf-8")
@@ -477,6 +498,86 @@ rules:
         args = preauditor_ui.parse_args(["--host", "127.0.0.1", "--port", "9876"])
         self.assertEqual(args.host, "127.0.0.1")
         self.assertEqual(args.port, 9876)
+
+
+class MobileReleaseRadarTests(unittest.TestCase):
+    def make_apk(self, root: Path, name: str, manifest: str, extra_files: dict[str, str] | None = None) -> Path:
+        apk = root / name
+        with zipfile.ZipFile(apk, "w") as archive:
+            archive.writestr("AndroidManifest.xml", manifest)
+            for filename, content in (extra_files or {}).items():
+                archive.writestr(filename, content)
+        return apk
+
+    def make_ipa(self, root: Path, name: str, info: dict, extra_files: dict[str, str] | None = None) -> Path:
+        ipa = root / name
+        with zipfile.ZipFile(ipa, "w") as archive:
+            archive.writestr("Payload/Demo.app/Info.plist", plistlib.dumps(info))
+            for filename, content in (extra_files or {}).items():
+                archive.writestr(f"Payload/Demo.app/{filename}", content)
+        return ipa
+
+    def test_android_artifact_detects_release_risks(self):
+        manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.demo" android:versionName="1.0" android:versionCode="1">
+  <uses-permission android:name="android.permission.CAMERA" />
+  <application android:debuggable="true" android:allowBackup="true" android:usesCleartextTraffic="true">
+    <activity android:name=".DeepLinkActivity" android:exported="true" />
+  </application>
+</manifest>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            apk = self.make_apk(Path(tmp), "demo.apk", manifest, {"assets/config.txt": "api=https://api.example.com\n"})
+            profile = mobile_release_radar.analyze_artifact(apk)
+        rule_ids = {finding.rule_id for finding in profile.findings}
+        self.assertEqual(profile.platform, "android")
+        self.assertIn("android.permission.CAMERA", profile.dangerous_permissions)
+        self.assertIn("activity:.DeepLinkActivity", profile.exported_components)
+        self.assertTrue({"AND-001", "AND-002", "AND-003", "AND-005"} <= rule_ids)
+
+    def test_ios_artifact_detects_ats_risk_and_permissions(self):
+        info = {
+            "CFBundleIdentifier": "com.example.demo",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "85",
+            "CFBundleDisplayName": "Demo",
+            "NSCameraUsageDescription": "Camera is used for scans.",
+            "NSAppTransportSecurity": {"NSAllowsArbitraryLoads": True},
+            "CFBundleURLTypes": [{"CFBundleURLSchemes": ["demoapp"]}],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            ipa = self.make_ipa(Path(tmp), "demo.ipa", info, {"config.txt": "url=https://api.example.com"})
+            profile = mobile_release_radar.analyze_artifact(ipa)
+        self.assertEqual(profile.platform, "ios")
+        self.assertEqual(profile.bundle_id, "com.example.demo")
+        self.assertIn("NSCameraUsageDescription", profile.permissions)
+        self.assertIn("demoapp", profile.url_schemes)
+        self.assertIn("IOS-001", {finding.rule_id for finding in profile.findings})
+
+    def test_mobile_release_diff_marks_new_and_fixed_risks(self):
+        previous_manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.demo">
+  <application android:allowBackup="true" />
+</manifest>
+"""
+        current_manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.demo">
+  <uses-permission android:name="android.permission.READ_CONTACTS" />
+  <application android:usesCleartextTraffic="true">
+    <service android:name=".SyncService" android:exported="true" />
+  </application>
+</manifest>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            previous = mobile_release_radar.analyze_artifact(self.make_apk(root, "old.apk", previous_manifest))
+            current = mobile_release_radar.analyze_artifact(self.make_apk(root, "new.apk", current_manifest))
+            payload = mobile_release_radar.result_payload(current, previous)
+        self.assertEqual(payload["decision"], "needs_review")
+        self.assertGreater(payload["comparison"]["new_findings"], 0)
+        self.assertGreater(payload["comparison"]["fixed_findings"], 0)
+        self.assertIn("android.permission.READ_CONTACTS", payload["comparison"]["added_dangerous_permissions"])
+        self.assertIn("service:.SyncService", payload["comparison"]["added_exported_components"])
 
 
 if __name__ == "__main__":

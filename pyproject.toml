@@ -33,6 +33,7 @@ dev = []
 [project.scripts]
 preauditor = "preauditor:main"
 preauditor-ui = "preauditor_ui:main"
+mobile-release-radar = "mobile_release_radar:main"
 
 [tool.setuptools]
-py-modules = ["preauditor", "preauditor_ui"]
+py-modules = ["preauditor", "preauditor_ui", "mobile_release_radar"]
