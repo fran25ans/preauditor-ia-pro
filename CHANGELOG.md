@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Añade `mobile-release-radar`, una herramienta para analizar y comparar releases móviles Android (`.apk`, `.aab`) e iOS (`.ipa`).
+- Añade `mobile-release-ui`, una interfaz web local separada para analizar APK/AAB/IPA y ver la decisión de release.
 - Detecta permisos, componentes exportados, configuraciones móviles inseguras, dominios, endpoints, secretos y cambios entre builds.
 - Genera decisión preliminar de release: `APPROVED`, `NEEDS_REVIEW` o `BLOCKED`.
 

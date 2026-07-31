@@ -12,6 +12,7 @@
 - `preauditor.py`: motor principal.
 - `preauditor_ui.py`: interfaz web local.
 - `mobile_release_radar.py`: comparador de releases moviles Android/iOS.
+- `mobile_release_ui.py`: interfaz web local para Mobile Release Radar.
 - `README.md`: documentacion de uso.
 - `install.sh`: instalador local.
 - `dist/preauditor_ia-0.1.0-py3-none-any.whl`: paquete instalable.
@@ -28,6 +29,7 @@
 ```bash
 preauditor --profile pro --list-rules
 preauditor-ui
+mobile-release-ui
 mobile-release-radar /Users/franciscojosegimenoesteban/Downloads/85.apk --out deliverables/mobile-85/mobile-report.md --html deliverables/mobile-85/mobile-report.html --json deliverables/mobile-85/mobile-report.json
 preauditor ./sample-vulnerable --profile pro --ollama --fail-on never
 preauditor ./sample-vulnerable --profile pro --rules-file examples/custom-rules.yml --fail-on never

@@ -30,13 +30,14 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -e .
 
       - name: Compile modules
-        run: python -m py_compile preauditor.py preauditor_ui.py mobile_release_radar.py
+        run: python -m py_compile preauditor.py preauditor_ui.py mobile_release_radar.py mobile_release_ui.py
 
       - name: Check installed commands
         run: |
           preauditor --help >/dev/null
           preauditor-ui --help >/dev/null
           mobile-release-radar --help >/dev/null
+          mobile-release-ui --help >/dev/null
 
       - name: Run tests
         run: python -m unittest discover -s tests -v

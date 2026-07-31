@@ -35,3 +35,4 @@ fi
 
 echo "Pre-Auditor IA instalado. Prueba: preauditor --profile pro --list-rules"
 echo "Mobile Release Radar instalado. Prueba: mobile-release-radar ./app.apk --out mobile-report.md"
+echo "Mobile Release Radar UI instalada. Prueba: mobile-release-ui"

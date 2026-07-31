@@ -11,6 +11,7 @@ Pre-Auditor IA Pro instala dos comandos locales:
 - `preauditor`
 - `preauditor-ui`
 - `mobile-release-radar`
+- `mobile-release-ui`
 
 ### Instalación rápida recomendada
 
@@ -207,6 +208,30 @@ mobile-release-radar ./app-release.apk --previous ./previous.apk --fail-on needs
 ```
 
 `mobile-release-radar` es una comprobación preliminar de release. No sustituye una revisión móvil experta ni herramientas especializadas como MobSF; puede complementarlas y centrarse en el diferencial diario de la build.
+
+### Interfaz web de Mobile Release Radar
+
+También puedes usar una UI separada para analizar builds móviles:
+
+```bash
+mobile-release-ui
+```
+
+Abre:
+
+```text
+http://127.0.0.1:8780
+```
+
+Desde esa pantalla puedes:
+
+- seleccionar APK/AAB/IPA actual
+- seleccionar APK/AAB/IPA anterior opcional
+- elegir plataforma Android/iOS o autodetección
+- generar informe HTML, Markdown y JSON
+- ver score, decisión de release, hallazgos prioritarios y comparativa antes/después
+
+La UI móvil es local y escucha solo en `127.0.0.1`.
 
 ## Qué detecta
 

@@ -11,6 +11,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 
 import mobile_release_radar
+import mobile_release_ui
 import preauditor
 import preauditor_ui
 
@@ -578,6 +579,40 @@ class MobileReleaseRadarTests(unittest.TestCase):
         self.assertGreater(payload["comparison"]["fixed_findings"], 0)
         self.assertIn("android.permission.READ_CONTACTS", payload["comparison"]["added_dangerous_permissions"])
         self.assertIn("service:.SyncService", payload["comparison"]["added_exported_components"])
+
+    def test_mobile_release_ui_renders_home(self):
+        html_text = mobile_release_ui.render_home().decode("utf-8")
+        self.assertIn("Mobile Release Radar", html_text)
+        self.assertIn("Analyze Mobile Release", html_text)
+        self.assertIn("Current APK/AAB/IPA", html_text)
+
+    def test_mobile_release_ui_rejects_remote_host(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                mobile_release_ui.parse_args(["--host", "0.0.0.0"])
+
+    def test_mobile_release_ui_scan_generates_outputs(self):
+        manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.demo">
+  <application android:allowBackup="true" />
+</manifest>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            apk = self.make_apk(root, "demo.apk", manifest)
+            output = root / "out"
+            mobile_release_ui.GENERATED_ARTIFACT_ROOTS.add(output.resolve())
+            result = mobile_release_ui.scan_mobile_release(
+                {
+                    "artifact": str(apk),
+                    "output_dir": str(output),
+                    "platform": "auto",
+                }
+            )
+        self.assertEqual(result["platform"], "android")
+        self.assertIn("HTML Report", result["files"])
+        self.assertIn("Markdown Report", result["files"])
+        self.assertIn("JSON Data", result["files"])
 
 
 if __name__ == "__main__":
