@@ -8,12 +8,12 @@
   },
   "limited_by_request_budget": false,
   "kpis": {
-    "tests_executed": 2,
-    "proven_vulnerabilities": 0,
+    "tests_executed": 4,
+    "proven_vulnerabilities": 2,
     "validated_findings": 0,
     "fixed_vulnerabilities": 2,
     "inconclusive": 0,
-    "bola": 2,
+    "bola": 4,
     "bfla": 0,
     "privilege_escalation": 0
   },
@@ -50,7 +50,7 @@
           "Expires": "0",
           "X-Frame-Options": "DENY",
           "Content-Length": "0",
-          "Date": "Mon, 17 Aug 2026 10:39:24 GMT",
+          "Date": "Mon, 17 Aug 2026 11:12:12 GMT",
           "Connection": "close"
         },
         "response_body_preview": "",
@@ -59,7 +59,7 @@
       "affected_code": "src/main/java/local/proofsec/test2/api/VaultController.java:19",
       "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read document records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
       "regression_test": "@Test\nvoid alpha_cannot_read_document_DOC-B_owned_by_bravo() throws Exception {\n    mockMvc.perform(get(\"/api/vault/documents/DOC-B\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"alpha\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_087948d7127c99c3\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
-      "generated_at": "2026-08-17T10:39:24.298279+00:00"
+      "generated_at": "2026-08-17T11:12:12.266391+00:00"
     },
     {
       "proof_id": "proof_fb191e30882783e9",
@@ -93,7 +93,7 @@
           "Expires": "0",
           "X-Frame-Options": "DENY",
           "Content-Length": "0",
-          "Date": "Mon, 17 Aug 2026 10:39:24 GMT",
+          "Date": "Mon, 17 Aug 2026 11:12:12 GMT",
           "Connection": "close"
         },
         "response_body_preview": "",
@@ -102,47 +102,95 @@
       "affected_code": "src/main/java/local/proofsec/test2/api/VaultController.java:19",
       "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read document records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
       "regression_test": "@Test\nvoid bravo_cannot_read_document_DOC-A_owned_by_alpha() throws Exception {\n    mockMvc.perform(get(\"/api/vault/documents/DOC-A\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"bravo\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_087948d7127c99c3\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
-      "generated_at": "2026-08-17T10:39:24.301250+00:00"
+      "generated_at": "2026-08-17T11:12:12.268159+00:00"
+    },
+    {
+      "proof_id": "proof_0890f056ed3ade41",
+      "finding_state": "PROVEN",
+      "invariant_id": "dyn_inv_a4f31c29fa49f68f",
+      "invariant_name": "dynamic_records_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "exploitability": "PROVEN",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "200",
+      "identity": "alpha",
+      "resource": "record_REC-B-01",
+      "resource_owner": "bravo",
+      "endpoint": "GET /v3/workspaces/{tenant}/records/{recordKey}",
+      "classification": "BOLA",
+      "conclusion": "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Response confirms the requested resource id and an ownership marker for the other identity.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:18081/v3/workspaces/TEN-A/records/REC-B-01",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 200,
+        "response_headers": {
+          "X-Content-Type-Options": "nosniff",
+          "X-XSS-Protection": "0",
+          "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+          "X-Frame-Options": "DENY",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Date": "Mon, 17 Aug 2026 11:12:12 GMT",
+          "Connection": "close"
+        },
+        "response_body_preview": "{\"title\":\"Bravo confidential\",\"scope\":{\"tenant\":\"TEN-B\",\"custodian\":{\"memberRef\":\"MBR-200\"}},\"recordKey\":\"REC-B-01\",\"classification\":\"PRIVATE\"}",
+        "error": ""
+      },
+      "affected_code": "src/main/java/local/proofsec/test2/api/RecordsController.java:24",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read record records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid alpha_cannot_read_record_REC-B-01_owned_by_bravo() throws Exception {\n    mockMvc.perform(get(\"/v3/workspaces/REC-B-01/records/REC-B-01\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"alpha\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_a4f31c29fa49f68f\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:12:12.269931+00:00"
+    },
+    {
+      "proof_id": "proof_3fa3087755ff5c34",
+      "finding_state": "PROVEN",
+      "invariant_id": "dyn_inv_a4f31c29fa49f68f",
+      "invariant_name": "dynamic_records_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "exploitability": "PROVEN",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "200",
+      "identity": "bravo",
+      "resource": "record_REC-A-01",
+      "resource_owner": "alpha",
+      "endpoint": "GET /v3/workspaces/{tenant}/records/{recordKey}",
+      "classification": "BOLA",
+      "conclusion": "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Response confirms the requested resource id and an ownership marker for the other identity.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:18081/v3/workspaces/TEN-B/records/REC-A-01",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 200,
+        "response_headers": {
+          "X-Content-Type-Options": "nosniff",
+          "X-XSS-Protection": "0",
+          "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+          "X-Frame-Options": "DENY",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Date": "Mon, 17 Aug 2026 11:12:12 GMT",
+          "Connection": "close"
+        },
+        "response_body_preview": "{\"title\":\"Alpha confidential\",\"scope\":{\"tenant\":\"TEN-A\",\"custodian\":{\"memberRef\":\"MBR-100\"}},\"recordKey\":\"REC-A-01\",\"classification\":\"PRIVATE\"}",
+        "error": ""
+      },
+      "affected_code": "src/main/java/local/proofsec/test2/api/RecordsController.java:24",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read record records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid bravo_cannot_read_record_REC-A-01_owned_by_alpha() throws Exception {\n    mockMvc.perform(get(\"/v3/workspaces/REC-A-01/records/REC-A-01\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"bravo\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_a4f31c29fa49f68f\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:12:12.271389+00:00"
     }
-  ],
-  "resource_discovery": {
-    "suggested_owner_fields": [
-      {
-        "resource": "documents",
-        "field": "permissions.ownerSubject",
-        "identity_attribute": "subject",
-        "matched_identity": "alpha,bravo",
-        "confidence": 0.98,
-        "reason": "Field permissions.ownerSubject matched 2/2 observed identity attribute values for subject; ambiguous matches: 0.",
-        "observations": 2,
-        "owner_matches": 2,
-        "ambiguous_matches": 0,
-        "semantic_match": true
-      },
-      {
-        "resource": "documents",
-        "field": "permissions.ownerSubject",
-        "identity_attribute": "subject",
-        "matched_identity": "alpha",
-        "confidence": 0.94,
-        "reason": "Response field permissions.ownerSubject matched identity alpha.subject during discovery.",
-        "observations": 1,
-        "owner_matches": 1,
-        "ambiguous_matches": 0,
-        "semantic_match": true
-      },
-      {
-        "resource": "documents",
-        "field": "permissions.ownerSubject",
-        "identity_attribute": "subject",
-        "matched_identity": "bravo",
-        "confidence": 0.94,
-        "reason": "Response field permissions.ownerSubject matched identity bravo.subject during discovery.",
-        "observations": 1,
-        "owner_matches": 1,
-        "ambiguous_matches": 0,
-        "semantic_match": true
-      }
-    ]
-  }
+  ]
 }

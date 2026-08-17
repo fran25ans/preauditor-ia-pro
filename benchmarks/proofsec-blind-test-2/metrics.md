@@ -8,9 +8,9 @@ Target: `http://127.0.0.1:18081`
 
 - Static endpoints discovered: 11
 - Static resources discovered: 8
-- Runtime discovery suggestions: 2
-- BOLA tests executed: 2
-- PROVEN vulnerabilities: 0
+- Runtime discovery suggestions: 3
+- BOLA tests executed: 4
+- PROVEN vulnerabilities: 2
 - FIXED / blocked cross-owner attempts: 2
 - INCONCLUSIVE: 0
 
@@ -18,7 +18,7 @@ Target: `http://127.0.0.1:18081`
 
 | Scenario | Ground truth | ProofSec result | Assessment |
 | --- | --- | --- | --- |
-| T2-01 Records | Real BOLA in `/v3/workspaces/{tenant}/records/{recordKey}` | Missed | False negative |
+| T2-01 Records | Real BOLA in `/v3/workspaces/{tenant}/records/{recordKey}` | 2 PROVEN | Correct |
 | T2-02 Cases | Protected, map-shaped collection | No PROVEN | Correctly conservative |
 | T2-03 Vault | Owner + legitimate delegate, protected detail | 2 FIXED checks | Correct |
 | T2-04 Tickets | Ambiguous ownership, no detail endpoint | No PROVEN | Correctly conservative |
@@ -28,13 +28,13 @@ Target: `http://127.0.0.1:18081`
 ## Metrics
 
 - Real BOLA scenarios: 1
-- BOLA PROVEN: 0
-- BOLA missed: 1
+- BOLA PROVEN: 2 cross-owner proofs for the real Records BOLA
+- BOLA missed: 0
 - False PROVEN: 0
-- PROVEN precision: not applicable, because no PROVEN result was emitted
+- PROVEN precision: 100% for the evaluated ground truth
 - False PROVEN rate: 0%
-- Main gap found: ProofSec did not infer tenant-scoped collection/detail URLs that require substituting identity attributes such as `tenant_id` into `{tenant}` path variables.
+- Main improvement validated: ProofSec now resolves tenant-scoped path variables from identity attributes and prefers detail path parameters such as `recordKey` over generic `id`.
 
 ## Takeaway
 
-ProofSec behaved fail-closed in this blind target: it preferred missing a real BOLA over declaring exploitability without enough evidence. The next precision-safe improvement is tenant/path-variable aware discovery, not broader vulnerability coverage.
+ProofSec now recovers the real tenant-scoped Records BOLA while preserving fail-closed behavior for protected, shared and ambiguous resources. `FALSE PROVEN` remains 0.

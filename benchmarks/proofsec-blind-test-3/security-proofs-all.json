@@ -6,17 +6,251 @@
     "dry_run": false,
     "allow_mutating": false
   },
-  "execution_state": "SAFE_STOP",
-  "reason": "ProofSec did not discover endpoints or resources for this FastAPI target, so dynamic validation was not executed.",
+  "limited_by_request_budget": false,
   "kpis": {
-    "tests_executed": 0,
-    "proven_vulnerabilities": 0,
+    "tests_executed": 6,
+    "proven_vulnerabilities": 4,
     "validated_findings": 0,
-    "fixed_vulnerabilities": 0,
+    "fixed_vulnerabilities": 2,
     "inconclusive": 0,
-    "bola": 0,
+    "bola": 6,
     "bfla": 0,
     "privilege_escalation": 0
   },
-  "proofs": []
+  "proofs": [
+    {
+      "proof_id": "proof_02101a6d68c2c39b",
+      "finding_state": "PROVEN",
+      "invariant_id": "dyn_inv_1d96d949edfc5135",
+      "invariant_name": "dynamic_assets_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "exploitability": "PROVEN",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "200",
+      "identity": "alpha",
+      "resource": "asset_AS-BLUE-1",
+      "resource_owner": "bravo",
+      "endpoint": "GET /gateway/assets/{asset_code}",
+      "classification": "BOLA",
+      "conclusion": "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Response confirms the requested resource id and an ownership marker for the other identity.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8082/gateway/assets/AS-BLUE-1",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 200,
+        "response_headers": {
+          "date": "Mon, 17 Aug 2026 11:13:49 GMT",
+          "server": "uvicorn",
+          "content-length": "134",
+          "content-type": "application/json",
+          "connection": "close"
+        },
+        "response_body_preview": "{\"assetCode\":\"AS-BLUE-1\",\"name\":\"Blue asset\",\"binding\":{\"tenantRef\":\"tenant-blue\",\"principal\":{\"id\":\"P-2002\"}},\"visibility\":\"PRIVATE\"}",
+        "error": ""
+      },
+      "affected_code": "runtime-discovery:1",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read asset records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid alpha_cannot_read_asset_AS-BLUE-1_owned_by_bravo() throws Exception {\n    mockMvc.perform(get(\"/gateway/assets/AS-BLUE-1\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"alpha\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_1d96d949edfc5135\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:13:49.684342+00:00"
+    },
+    {
+      "proof_id": "proof_f2f7f05c8b7f2ea9",
+      "finding_state": "PROVEN",
+      "invariant_id": "dyn_inv_1d96d949edfc5135",
+      "invariant_name": "dynamic_assets_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "exploitability": "PROVEN",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "200",
+      "identity": "bravo",
+      "resource": "asset_AS-RED-1",
+      "resource_owner": "alpha",
+      "endpoint": "GET /gateway/assets/{asset_code}",
+      "classification": "BOLA",
+      "conclusion": "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Response confirms the requested resource id and an ownership marker for the other identity.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8082/gateway/assets/AS-RED-1",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 200,
+        "response_headers": {
+          "date": "Mon, 17 Aug 2026 11:13:49 GMT",
+          "server": "uvicorn",
+          "content-length": "131",
+          "content-type": "application/json",
+          "connection": "close"
+        },
+        "response_body_preview": "{\"assetCode\":\"AS-RED-1\",\"name\":\"Red asset\",\"binding\":{\"tenantRef\":\"tenant-red\",\"principal\":{\"id\":\"P-1001\"}},\"visibility\":\"PRIVATE\"}",
+        "error": ""
+      },
+      "affected_code": "runtime-discovery:1",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read asset records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid bravo_cannot_read_asset_AS-RED-1_owned_by_alpha() throws Exception {\n    mockMvc.perform(get(\"/gateway/assets/AS-RED-1\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"bravo\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_1d96d949edfc5135\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:13:49.685354+00:00"
+    },
+    {
+      "proof_id": "proof_429b35b686885c0f",
+      "finding_state": "FIXED",
+      "invariant_id": "dyn_inv_00f83c087fa73582",
+      "invariant_name": "dynamic_reports_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "exploitability": "FIXED",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "403",
+      "identity": "alpha",
+      "resource": "report_REP-B",
+      "resource_owner": "bravo",
+      "endpoint": "GET /api/reports/{report_id}",
+      "classification": "BOLA",
+      "conclusion": "Invariant respected during this run. Cross-owner access was rejected. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Cross-owner request was rejected with an authorization-style status.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8082/api/reports/REP-B",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 403,
+        "response_headers": {
+          "date": "Mon, 17 Aug 2026 11:13:49 GMT",
+          "server": "uvicorn",
+          "content-length": "22",
+          "content-type": "application/json",
+          "connection": "close"
+        },
+        "response_body_preview": "{\"detail\":\"Forbidden\"}",
+        "error": ""
+      },
+      "affected_code": "runtime-discovery:1",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read report records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid alpha_cannot_read_report_REP-B_owned_by_bravo() throws Exception {\n    mockMvc.perform(get(\"/api/reports/REP-B\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"alpha\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_00f83c087fa73582\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:13:49.686607+00:00"
+    },
+    {
+      "proof_id": "proof_cdaed9b050ea5dc3",
+      "finding_state": "FIXED",
+      "invariant_id": "dyn_inv_00f83c087fa73582",
+      "invariant_name": "dynamic_reports_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "exploitability": "FIXED",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "403",
+      "identity": "bravo",
+      "resource": "report_REP-A",
+      "resource_owner": "alpha",
+      "endpoint": "GET /api/reports/{report_id}",
+      "classification": "BOLA",
+      "conclusion": "Invariant respected during this run. Cross-owner access was rejected. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Cross-owner request was rejected with an authorization-style status.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8082/api/reports/REP-A",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 403,
+        "response_headers": {
+          "date": "Mon, 17 Aug 2026 11:13:49 GMT",
+          "server": "uvicorn",
+          "content-length": "22",
+          "content-type": "application/json",
+          "connection": "close"
+        },
+        "response_body_preview": "{\"detail\":\"Forbidden\"}",
+        "error": ""
+      },
+      "affected_code": "runtime-discovery:1",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read report records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid bravo_cannot_read_report_REP-A_owned_by_alpha() throws Exception {\n    mockMvc.perform(get(\"/api/reports/REP-A\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"bravo\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_00f83c087fa73582\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:13:49.687352+00:00"
+    },
+    {
+      "proof_id": "proof_6c057a5b0fd1b9d8",
+      "finding_state": "PROVEN",
+      "invariant_id": "dyn_inv_4d64728f58443353",
+      "invariant_name": "dynamic_secrets_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "exploitability": "PROVEN",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "200",
+      "identity": "alpha",
+      "resource": "secret_SEC-B",
+      "resource_owner": "bravo",
+      "endpoint": "GET /profiles/secrets/{secret_ref}",
+      "classification": "BOLA",
+      "conclusion": "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Response confirms the requested resource id and an ownership marker for the other identity.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8082/profiles/secrets/SEC-B",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 200,
+        "response_headers": {
+          "date": "Mon, 17 Aug 2026 11:13:49 GMT",
+          "server": "uvicorn",
+          "content-length": "67",
+          "content-type": "application/json",
+          "connection": "close"
+        },
+        "response_body_preview": "{\"se****Ref\":\"SEC-B\",\"label\":\"Bravo se****\",\"ownerSub\":\"usr-b-909\"}",
+        "error": ""
+      },
+      "affected_code": "runtime-discovery:1",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read secret records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid alpha_cannot_read_secret_SEC-B_owned_by_bravo() throws Exception {\n    mockMvc.perform(get(\"/profiles/secrets/SEC-B\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"alpha\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_4d64728f58443353\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:13:49.688222+00:00"
+    },
+    {
+      "proof_id": "proof_314584647d8df860",
+      "finding_state": "PROVEN",
+      "invariant_id": "dyn_inv_4d64728f58443353",
+      "invariant_name": "dynamic_secrets_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "exploitability": "PROVEN",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "200",
+      "identity": "bravo",
+      "resource": "secret_SEC-A",
+      "resource_owner": "alpha",
+      "endpoint": "GET /profiles/secrets/{secret_ref}",
+      "classification": "BOLA",
+      "conclusion": "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Response confirms the requested resource id and an ownership marker for the other identity.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8082/profiles/secrets/SEC-A",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 200,
+        "response_headers": {
+          "date": "Mon, 17 Aug 2026 11:13:49 GMT",
+          "server": "uvicorn",
+          "content-length": "67",
+          "content-type": "application/json",
+          "connection": "close"
+        },
+        "response_body_preview": "{\"se****Ref\":\"SEC-A\",\"label\":\"Alpha se****\",\"ownerSub\":\"usr-a-701\"}",
+        "error": ""
+      },
+      "affected_code": "runtime-discovery:1",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read secret records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid bravo_cannot_read_secret_SEC-A_owned_by_alpha() throws Exception {\n    mockMvc.perform(get(\"/profiles/secrets/SEC-A\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"bravo\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_4d64728f58443353\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T11:13:49.688824+00:00"
+    }
+  ]
 }

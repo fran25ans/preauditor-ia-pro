@@ -20,6 +20,7 @@ from proofsec.models import (
     stable_hash,
 )
 from proofsec.proof_validator import validate_authorization_response, validate_bola_response
+from proofsec.resource_discovery import identity_attribute
 from proofsec.regression import generate_spring_mockmvc_test
 from proofsec.remediation import suggest_fix_for_bola
 from proofsec.runtime_config import (
@@ -36,10 +37,11 @@ READ_METHODS = {"GET", "HEAD"}
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
-def endpoint_url(target: ProofSecTarget, endpoint: EndpointNode, resource_id: str) -> str:
+def endpoint_url(target: ProofSecTarget, endpoint: EndpointNode, resource_id: str, identity: ProofSecIdentity | None = None) -> str:
     path = endpoint.path
     for parameter in endpoint.parameters:
-        path = path.replace("{" + parameter + "}", resource_id)
+        value = identity_attribute(identity, parameter) if identity else None
+        path = path.replace("{" + parameter + "}", value or resource_id)
     return target.base_url.rstrip("/") + "/" + path.lstrip("/")
 
 
@@ -61,12 +63,41 @@ def matching_read_endpoints(model_path: Path, invariant: ContractInvariant) -> l
         and endpoint.action == invariant.action
         and endpoint.method in READ_METHODS
         and endpoint.parameters
+        and endpoint.path.rstrip("/").rsplit("/", 1)[-1].startswith("{")
+    ]
+
+
+def dynamic_read_endpoints_from_discovery(config: dict, invariant: ContractInvariant) -> list[EndpointNode]:
+    import re
+
+    raw = (config.get("discovery") or {}).get(invariant.resource)
+    if not isinstance(raw, dict):
+        return []
+    detail_endpoint = str(raw.get("detail_endpoint") or "").strip()
+    if not detail_endpoint.startswith("/"):
+        return []
+    parameters = tuple(sorted(re.findall(r"\{([^}]+)\}", detail_endpoint)))
+    return [
+        EndpointNode(
+            method="GET",
+            path=detail_endpoint,
+            controller="RuntimeDiscovery",
+            handler=f"get_{invariant.resource}",
+            file="runtime-discovery",
+            line=1,
+            authorization="unknown",
+            roles=(),
+            resource=invariant.resource,
+            action="read",
+            parameters=parameters,
+        )
     ]
 
 
 def dynamic_bola_invariants_from_resources(
     model_path: Path,
     resources: list[ProofSecResourceExample],
+    config: dict | None = None,
 ) -> list[ContractInvariant]:
     """Build test hypotheses from high-confidence dynamic ownership discovery."""
     model = load_security_model(model_path)
@@ -75,6 +106,12 @@ def dynamic_bola_invariants_from_resources(
         for endpoint in model.endpoints
         if endpoint.action == "read" and endpoint.method in READ_METHODS and endpoint.parameters
     }
+    if config:
+        resources_with_detail_endpoints.update(
+            str(resource)
+            for resource, raw in (config.get("discovery") or {}).items()
+            if isinstance(raw, dict) and str(raw.get("detail_endpoint") or "").startswith("/")
+        )
     candidates: dict[str, ContractInvariant] = {}
     for resource in resources:
         if resource.resource not in resources_with_detail_endpoints:
@@ -235,9 +272,10 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
     requests_executed = 0
     invariants = matching_confirmed_bola_invariants(contract_path)
     if not invariants:
-        invariants = dynamic_bola_invariants_from_resources(model_path, resources)
+        invariants = dynamic_bola_invariants_from_resources(model_path, resources, config)
     for invariant in invariants:
-        for endpoint in matching_read_endpoints(model_path, invariant):
+        endpoints = matching_read_endpoints(model_path, invariant) or dynamic_read_endpoints_from_discovery(config, invariant)
+        for endpoint in endpoints:
             for identity in identities.values():
                 for resource in resources:
                     if resource.resource != invariant.resource or resource.owner_identity == identity.name:
@@ -250,7 +288,7 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
                         continue
                     if requests_executed >= target.max_requests:
                         return proof_payload(proofs, target, limited=True, resource_discovery_suggestions=discovery_suggestions)
-                    url = endpoint_url(target, endpoint, resource.resource_id)
+                    url = endpoint_url(target, endpoint, resource.resource_id, identity)
                     evidence = run_http_request(target, endpoint.method, url, auth_headers(identity))
                     requests_executed += 1
                     proofs.append(build_bola_proof(invariant, endpoint, identity, resource, evidence))
@@ -284,7 +322,7 @@ def run_authorization_tests(model_path: Path, config_path: Path, test_type: str)
                 continue
             if requests_executed >= target.max_requests:
                 return proof_payload(proofs, target, limited=True)
-            url = endpoint_url(target, endpoint, "1")
+            url = endpoint_url(target, endpoint, "1", identity)
             evidence = run_http_request(target, endpoint.method, url, auth_headers(identity))
             requests_executed += 1
             classification = "BFLA" if test_type == "bfla" else "PRIVILEGE_ESCALATION"

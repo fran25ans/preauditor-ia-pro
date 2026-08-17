@@ -7,10 +7,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from proofsec.contract import load_security_model
+from proofsec.discovery.openapi import model_from_openapi
 from proofsec.http.client import run_http_request
 from proofsec.models import EndpointNode, ProjectSecurityModel
 from proofsec.ownership_suggestions import suggest_owner_fields_from_observations
 from proofsec.response_shape import infer_response_shape
+from proofsec.resource_discovery import endpoint_for_identity
 from proofsec.runtime_config import assert_target_authorized, auth_headers, load_identities, load_runtime_config, load_target
 
 
@@ -28,10 +30,12 @@ class DiscoveryConfigSuggestion:
     shape_reason: str = ""
     id_candidates: tuple[dict[str, object], ...] = ()
     owner_field_suggestions: tuple[dict[str, object], ...] = ()
+    detail_endpoint: str = ""
 
     def to_runtime_entry(self) -> dict[str, object]:
         return {
             "list_endpoint": self.list_endpoint,
+            "detail_endpoint": self.detail_endpoint,
             "items_path": self.items_path,
             "id_field": self.id_field,
             "owner_fields": list(self.owner_fields),
@@ -53,12 +57,12 @@ def normalized_collection_path(path: str) -> str:
 
 
 def is_collection_get(endpoint: EndpointNode) -> bool:
-    if endpoint.method != "GET" or endpoint.parameters:
+    if endpoint.method != "GET":
         return False
     if endpoint.resource in {"", "unknown"}:
         return False
     tail = endpoint.path.rstrip("/").rsplit("/", 1)[-1]
-    if "{" in endpoint.path:
+    if tail.startswith("{"):
         return False
     return tail.lower() == endpoint.resource.lower() or tail.lower() in {
         "assigned",
@@ -75,9 +79,39 @@ def detail_endpoints_for(model: ProjectSecurityModel, resource: str) -> tuple[st
     endpoints = [
         f"{endpoint.method} {endpoint.path}"
         for endpoint in model.endpoints
-        if endpoint.resource == resource and endpoint.method == "GET" and endpoint.parameters
+        if endpoint.resource == resource and endpoint.method == "GET" and endpoint.parameters and not is_collection_get(endpoint)
     ]
     return tuple(sorted(endpoints))
+
+
+def detail_path_for(model: ProjectSecurityModel, resource: str, collection_path: str = "") -> str:
+    endpoints = [
+        endpoint.path
+        for endpoint in model.endpoints
+        if endpoint.resource == resource and endpoint.method == "GET" and endpoint.parameters and not is_collection_get(endpoint)
+    ]
+    if not endpoints:
+        return ""
+    if collection_path:
+        prefix = normalized_collection_path(collection_path).rstrip("/") + "/{"
+        prefixed = [path for path in endpoints if normalized_collection_path(path).startswith(prefix)]
+        if prefixed:
+            return sorted(prefixed, key=lambda item: (item.count("{"), item))[0]
+    return sorted(endpoints, key=lambda item: (item.count("{"), item))[0]
+
+
+def detail_parameters_for(model: ProjectSecurityModel, resource: str, collection_path: str = "") -> tuple[str, ...]:
+    detail_path = detail_path_for(model, resource, collection_path)
+    for endpoint in model.endpoints:
+        if endpoint.path == detail_path and endpoint.resource == resource:
+            return endpoint.parameters
+    return ()
+
+
+def path_parameters(path: str) -> tuple[str, ...]:
+    import re
+
+    return tuple(sorted(re.findall(r"\{([^}]+)\}", path)))
 
 
 def suggest_discovery_config(model: ProjectSecurityModel) -> dict[str, object]:
@@ -94,6 +128,7 @@ def suggest_discovery_config(model: ProjectSecurityModel) -> dict[str, object]:
         suggestions[endpoint.resource] = DiscoveryConfigSuggestion(
             resource=endpoint.resource,
             list_endpoint=normalized_collection_path(endpoint.path),
+            detail_endpoint=detail_path_for(model, endpoint.resource, endpoint.path),
             items_path="data",
             id_field="auto",
             owner_fields=(),
@@ -122,6 +157,17 @@ def enhance_discovery_with_response_shapes(payload: dict[str, object], runtime_c
     assert_target_authorized(target)
     identities = load_identities(runtime_config)
     discovery = payload.get("discovery")
+    if isinstance(discovery, dict) and not discovery:
+        openapi_evidence = run_http_request(target, "GET", target.base_url.rstrip("/") + "/openapi.json", {})
+        if openapi_evidence.status and 200 <= openapi_evidence.status < 300:
+            try:
+                spec = json.loads(openapi_evidence.response_body or openapi_evidence.response_body_preview)
+            except json.JSONDecodeError:
+                spec = None
+            if isinstance(spec, dict):
+                runtime_model = model_from_openapi(spec, project_path=str(payload.get("project_path") or "runtime-openapi"))
+                payload = suggest_discovery_config(runtime_model)
+                discovery = payload.get("discovery")
     if not isinstance(discovery, dict):
         return payload
     suggestions_by_resource = {
@@ -138,14 +184,22 @@ def enhance_discovery_with_response_shapes(payload: dict[str, object], runtime_c
         observations = []
         parsed_samples = []
         for identity in identities.values():
-            evidence = run_http_request(target, "GET", target.base_url.rstrip("/") + list_endpoint, auth_headers(identity))
+            resolved_endpoint = endpoint_for_identity(list_endpoint, identity)
+            if not resolved_endpoint:
+                continue
+            evidence = run_http_request(target, "GET", target.base_url.rstrip("/") + resolved_endpoint, auth_headers(identity))
             if evidence.status is None or evidence.status < 200 or evidence.status >= 300:
                 continue
             try:
                 parsed = json.loads(evidence.response_body or evidence.response_body_preview)
             except json.JSONDecodeError:
                 continue
-            shape = infer_response_shape(str(resource), parsed, has_detail_endpoint=True)
+            shape = infer_response_shape(
+                str(resource),
+                parsed,
+                has_detail_endpoint=True,
+                detail_parameters=path_parameters(str(entry.get("detail_endpoint") or "")),
+            )
             parsed_samples.append(shape)
             from proofsec.resource_discovery import collection_from_response
 

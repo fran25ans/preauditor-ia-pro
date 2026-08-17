@@ -25,7 +25,10 @@ def value_at_path(value: Any, dotted_path: str) -> Any:
     for part in dotted_path.split("."):
         if part == "":
             continue
-        if isinstance(current, dict):
+        if isinstance(current, list):
+            current = [value_at_path(item, part) for item in current]
+            current = [item for item in current if item is not None]
+        elif isinstance(current, dict):
             current = current.get(part)
         else:
             return None
@@ -38,11 +41,53 @@ def collection_from_response(parsed: Any, items_path: str) -> list[Any]:
     if isinstance(parsed, list):
         return parsed
     if isinstance(parsed, dict):
+        values = list(parsed.values())
+        if values and all(isinstance(item, dict) for item in values):
+            return values
         for key in ("items", "data", "results", "content"):
             value = parsed.get(key)
             if isinstance(value, list):
                 return value
     return []
+
+
+def identity_attribute(identity: ProofSecIdentity, parameter: str) -> str | None:
+    candidates = (
+        parameter,
+        parameter.replace("-", "_"),
+        parameter.replace("_", ""),
+        f"{parameter}_id",
+        f"{parameter}Id",
+        f"{parameter}_ref",
+        f"{parameter}Ref",
+    )
+    lowered = {key.lower(): value for key, value in identity.attributes.items()}
+    for candidate in candidates:
+        value = identity.attributes.get(candidate)
+        if value:
+            return normalize(value)
+        value = lowered.get(candidate.lower())
+        if value:
+            return normalize(value)
+    return None
+
+
+def endpoint_for_identity(endpoint: str, identity: ProofSecIdentity) -> str | None:
+    import re
+
+    resolved = endpoint
+    for parameter in re.findall(r"\{([^}]+)\}", endpoint):
+        value = identity_attribute(identity, parameter)
+        if not value:
+            return None
+        resolved = resolved.replace("{" + parameter + "}", value)
+    return resolved
+
+
+def path_parameters(path: str) -> tuple[str, ...]:
+    import re
+
+    return tuple(sorted(re.findall(r"\{([^}]+)\}", path)))
 
 
 def marker_from_item(item: Any, marker_fields: tuple[str, ...], owner_identity: str) -> tuple[str, ...]:
@@ -84,13 +129,17 @@ def discover_resources_with_suggestions(
         list_endpoint = str(raw.get("list_endpoint") or "").strip()
         configured_id_field = str(raw.get("id_field") or "auto")
         configured_items_path = str(raw.get("items_path") or "")
+        detail_parameters = path_parameters(str(raw.get("detail_endpoint") or ""))
         marker_fields = tuple(str(item) for item in raw.get("owner_marker_fields", ["owner", "owner.id", "advisor", "advisor.id", "advisorId"]))
         configured_owner_fields = tuple(str(item) for item in raw.get("owner_fields", []))
         if not list_endpoint.startswith("/"):
             continue
         observations: list[tuple[dict[str, Any], ProofSecIdentity]] = []
         for identity in identities.values():
-            url = target.base_url.rstrip("/") + list_endpoint
+            resolved_endpoint = endpoint_for_identity(list_endpoint, identity)
+            if not resolved_endpoint:
+                continue
+            url = target.base_url.rstrip("/") + resolved_endpoint
             evidence = run_http_request(target, "GET", url, auth_headers(identity))
             if evidence.status is None or evidence.status < 200 or evidence.status >= 300:
                 continue
@@ -98,7 +147,12 @@ def discover_resources_with_suggestions(
                 parsed = json.loads(evidence.response_body or evidence.response_body_preview)
             except json.JSONDecodeError:
                 continue
-            shape = infer_response_shape(resource_name, parsed, has_detail_endpoint=True)
+            shape = infer_response_shape(
+                resource_name,
+                parsed,
+                has_detail_endpoint=True,
+                detail_parameters=detail_parameters,
+            )
             items_path = configured_items_path or shape.items_path
             id_field = configured_id_field if configured_id_field != "auto" else shape.id_field
             if not id_field:

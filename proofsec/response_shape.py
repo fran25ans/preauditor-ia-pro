@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 
-COMMON_COLLECTION_KEYS = ("content", "data", "results", "items")
+COMMON_COLLECTION_KEYS = ("content", "data", "results", "items", "entries", "nodes")
 ID_FIELD_NAMES = ("id", "uuid")
 NON_RESOURCE_COLLECTION_KEYS = ("links", "_links")
 
@@ -54,14 +54,17 @@ def singular(resource: str) -> str:
     return lowered
 
 
-def scalar_fields(item: Any) -> dict[str, str]:
+def scalar_fields(item: Any, prefix: str = "", depth: int = 0) -> dict[str, str]:
     if not isinstance(item, dict):
         return {}
     fields: dict[str, str] = {}
     for key, value in item.items():
+        path = f"{prefix}.{key}" if prefix else str(key)
         if isinstance(value, (dict, list)) or value is None:
+            if isinstance(value, dict) and depth < 2 and str(key) not in {"relationships", "_links", "links"}:
+                fields.update(scalar_fields(value, path, depth + 1))
             continue
-        fields[str(key)] = normalize(value)
+        fields[path] = normalize(value)
     return fields
 
 
@@ -69,28 +72,41 @@ def collection_candidates(value: Any, prefix: str = "", depth: int = 0) -> list[
     if depth > 3:
         return []
     if isinstance(value, list):
-        return [(prefix, value)]
+        candidates = [(prefix, value)]
+        node_items = [item.get("node") for item in value if isinstance(item, dict) and isinstance(item.get("node"), dict)]
+        if node_items:
+            candidates.append((f"{prefix}.node" if prefix else "node", node_items))
+        return candidates
     if not isinstance(value, dict):
         return []
     candidates: list[tuple[str, list[Any]]] = []
     for key, item in value.items():
         path = f"{prefix}.{key}" if prefix else str(key)
         if isinstance(item, list):
-            candidates.append((path, item))
-        elif isinstance(item, dict):
+            candidates.extend(collection_candidates(item, path, depth + 1))
+        elif isinstance(item, dict) and item:
+            values = list(item.values())
+            if len(values) > 1 and all(isinstance(child, dict) for child in values):
+                candidates.append((path, values))
+                continue
             candidates.extend(collection_candidates(item, path, depth + 1))
     return candidates
 
 
 def score_collection(path: str, items: list[Any]) -> float:
-    if path.lower().rsplit(".", 1)[-1] in NON_RESOURCE_COLLECTION_KEYS:
+    path_parts = path.lower().split(".") if path else []
+    if path.lower().rsplit(".", 1)[-1] in NON_RESOURCE_COLLECTION_KEYS or any(part in NON_RESOURCE_COLLECTION_KEYS for part in path_parts):
         return 0.12
     dict_count = sum(1 for item in items if isinstance(item, dict))
     dict_ratio = dict_count / max(len(items), 1)
-    key_bonus = 0.24 if path in COMMON_COLLECTION_KEYS else 0.0
+    tail = path.lower().rsplit(".", 1)[-1] if path else ""
+    key_bonus = 0.24 if tail in COMMON_COLLECTION_KEYS else 0.0
+    embedded_bonus = 0.08 if "_embedded" in path_parts else 0.0
+    graph_bonus = 0.08 if tail == "node" else 0.0
+    map_bonus = 0.08 if tail in {"byid", "by_id", "entries"} else 0.0
     size_bonus = min(0.18, len(items) * 0.03)
     root_bonus = 0.1 if path == "" else 0.0
-    return min(0.98, 0.45 + (0.28 * dict_ratio) + key_bonus + size_bonus + root_bonus)
+    return min(0.98, 0.45 + (0.28 * dict_ratio) + key_bonus + embedded_bonus + graph_bonus + map_bonus + size_bonus + root_bonus)
 
 
 def infer_items_collection(parsed: Any) -> tuple[str, list[Any], float, str]:
@@ -110,8 +126,11 @@ def score_id_field(
     total_items: int,
     resource: str,
     has_detail_endpoint: bool,
+    detail_parameters: tuple[str, ...] = (),
 ) -> IdFieldCandidate:
     lowered = field.lower()
+    detail_parameter_names = {parameter.lower().replace("_", "") for parameter in detail_parameters}
+    field_compact = lowered.replace("_", "")
     resource_singular = singular(resource)
     present_ratio = len(values) / max(total_items, 1)
     unique_ratio = len(set(values)) / max(len(values), 1)
@@ -120,6 +139,12 @@ def score_id_field(
     if lowered in ID_FIELD_NAMES:
         score += 0.32
         reasons.append("field name is a canonical id")
+        if detail_parameter_names and field_compact not in detail_parameter_names:
+            score -= 0.18
+            reasons.append("generic id does not match the detail endpoint path parameter")
+    if detail_parameter_names and field_compact in detail_parameter_names:
+        score += 0.26
+        reasons.append("field name matches the detail endpoint path parameter")
     if lowered == f"{resource_singular}id" or lowered == f"{resource_singular}_id":
         score += 0.36
         reasons.append("field name matches the resource id")
@@ -164,6 +189,7 @@ def infer_id_field(
     resource: str,
     items: list[Any],
     has_detail_endpoint: bool = False,
+    detail_parameters: tuple[str, ...] = (),
 ) -> tuple[str | None, tuple[IdFieldCandidate, ...]]:
     values_by_field: dict[str, list[str]] = {}
     dict_items = [item for item in items if isinstance(item, dict)]
@@ -174,6 +200,8 @@ def infer_id_field(
         sorted(
             (
                 score_id_field(field, values, len(dict_items), resource, has_detail_endpoint)
+                if not detail_parameters
+                else score_id_field(field, values, len(dict_items), resource, has_detail_endpoint, detail_parameters)
                 for field, values in values_by_field.items()
             ),
             key=lambda item: (-item.confidence, item.field),
@@ -186,9 +214,14 @@ def infer_id_field(
     return candidates[0].field, candidates
 
 
-def infer_response_shape(resource: str, parsed: Any, has_detail_endpoint: bool = False) -> ResponseShapeSuggestion:
+def infer_response_shape(
+    resource: str,
+    parsed: Any,
+    has_detail_endpoint: bool = False,
+    detail_parameters: tuple[str, ...] = (),
+) -> ResponseShapeSuggestion:
     items_path, items, collection_confidence, collection_reason = infer_items_collection(parsed)
-    id_field, candidates = infer_id_field(resource, items, has_detail_endpoint)
+    id_field, candidates = infer_id_field(resource, items, has_detail_endpoint, detail_parameters)
     id_confidence = candidates[0].confidence if candidates else 0.35
     if id_field is None:
         id_confidence = 0.0

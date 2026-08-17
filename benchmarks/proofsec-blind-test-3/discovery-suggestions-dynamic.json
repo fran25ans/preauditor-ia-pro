@@ -1,8 +1,317 @@
 {
   "schema_version": "1.0",
   "project_path": "/Users/franciscojosegimenoesteban/Downloads/proofsec-blind-test-3",
-  "discovery": {},
-  "suggestions": [],
+  "discovery": {
+    "assets": {
+      "list_endpoint": "/gateway/assets",
+      "detail_endpoint": "/gateway/assets/{asset_code}",
+      "items_path": "edges.node",
+      "id_field": "assetCode",
+      "owner_fields": [
+        "binding.principal.id",
+        "binding.tenantRef"
+      ],
+      "owner_marker_fields": [
+        "binding.principal.id",
+        "binding.tenantRef",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "reports": {
+      "list_endpoint": "/api/reports",
+      "detail_endpoint": "/api/reports/{report_id}",
+      "items_path": "data",
+      "id_field": "report_id",
+      "owner_fields": [
+        "acl.owner",
+        "relationships.acl.data.owner"
+      ],
+      "owner_marker_fields": [
+        "acl.owner",
+        "relationships.acl.data.owner",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "secrets": {
+      "list_endpoint": "/profiles/secrets",
+      "detail_endpoint": "/profiles/secrets/{secret_ref}",
+      "items_path": "collection.entries",
+      "id_field": "secretRef",
+      "owner_fields": [
+        "ownerSub"
+      ],
+      "owner_marker_fields": [
+        "ownerSub",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "resource": "assets",
+      "list_endpoint": "/gateway/assets",
+      "items_path": "edges.node",
+      "id_field": "assetCode",
+      "owner_fields": [
+        "binding.principal.id",
+        "binding.tenantRef"
+      ],
+      "owner_marker_fields": [
+        "binding.principal.id",
+        "binding.tenantRef",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ],
+      "confidence": 0.94,
+      "reason": "GET /gateway/assets looks like a collection endpoint for assets; confirm response shape and ownership fields before dynamic testing.",
+      "related_detail_endpoints": [
+        "GET /access/assets/{asset_code}",
+        "GET /gateway/assets/{asset_code}"
+      ],
+      "shape_reason": "Detected edges.node as the most likely collection with 2 item(s). ID field candidate: assetCode.",
+      "id_candidates": [
+        {
+          "field": "assetCode",
+          "confidence": 0.99,
+          "reason": "field name matches the detail endpoint path parameter; field name matches the resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "binding.tenantRef",
+          "confidence": 0.74,
+          "reason": "field name looks like a stable resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "binding.principal.id",
+          "confidence": 0.72,
+          "reason": "field name ends with id; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "name",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "visibility",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        }
+      ],
+      "owner_field_suggestions": [
+        {
+          "resource": "assets",
+          "field": "binding.principal.id",
+          "identity_attribute": "principal_id",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.9,
+          "reason": "Field binding.principal.id matched 2/2 observed identity attribute values for principal_id; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": false
+        },
+        {
+          "resource": "assets",
+          "field": "binding.tenantRef",
+          "identity_attribute": "tenant",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.9,
+          "reason": "Field binding.tenantRef matched 2/2 observed identity attribute values for tenant; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": false
+        }
+      ],
+      "detail_endpoint": "/gateway/assets/{asset_code}"
+    },
+    {
+      "resource": "reports",
+      "list_endpoint": "/api/reports",
+      "items_path": "data",
+      "id_field": "report_id",
+      "owner_fields": [
+        "acl.owner",
+        "relationships.acl.data.owner"
+      ],
+      "owner_marker_fields": [
+        "acl.owner",
+        "relationships.acl.data.owner",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ],
+      "confidence": 0.98,
+      "reason": "GET /api/reports looks like a collection endpoint for reports; confirm response shape and ownership fields before dynamic testing.",
+      "related_detail_endpoints": [
+        "GET /api/reports/{report_id}"
+      ],
+      "shape_reason": "Detected data as the most likely collection with 1 item(s). ID field candidate: report_id.",
+      "id_candidates": [
+        {
+          "field": "report_id",
+          "confidence": 0.99,
+          "reason": "field name matches the detail endpoint path parameter; field name matches the resource id; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "id",
+          "confidence": 0.86,
+          "reason": "field name is a canonical id; generic id does not match the detail endpoint path parameter; field name ends with id; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "attributes.title",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "type",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "acl.owner",
+          "confidence": 0.36,
+          "reason": "field looks more like ownership than resource identity; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        }
+      ],
+      "owner_field_suggestions": [
+        {
+          "resource": "reports",
+          "field": "acl.owner",
+          "identity_attribute": "sub",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.98,
+          "reason": "Field acl.owner matched 2/2 observed identity attribute values for sub; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": true
+        },
+        {
+          "resource": "reports",
+          "field": "relationships.acl.data.owner",
+          "identity_attribute": "sub",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.98,
+          "reason": "Field relationships.acl.data.owner matched 2/2 observed identity attribute values for sub; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": true
+        }
+      ],
+      "detail_endpoint": "/api/reports/{report_id}"
+    },
+    {
+      "resource": "secrets",
+      "list_endpoint": "/profiles/secrets",
+      "items_path": "collection.entries",
+      "id_field": "secretRef",
+      "owner_fields": [
+        "ownerSub"
+      ],
+      "owner_marker_fields": [
+        "ownerSub",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ],
+      "confidence": 0.98,
+      "reason": "GET /profiles/secrets looks like a collection endpoint for secrets; confirm response shape and ownership fields before dynamic testing.",
+      "related_detail_endpoints": [
+        "GET /profiles/secrets/{secret_ref}"
+      ],
+      "shape_reason": "Detected collection.entries as the most likely collection with 1 item(s). ID field candidate: secretRef.",
+      "id_candidates": [
+        {
+          "field": "secretRef",
+          "confidence": 0.99,
+          "reason": "field name matches the detail endpoint path parameter; field name matches the resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "label",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "ownerSub",
+          "confidence": 0.36,
+          "reason": "field looks more like ownership than resource identity; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        }
+      ],
+      "owner_field_suggestions": [
+        {
+          "resource": "secrets",
+          "field": "ownerSub",
+          "identity_attribute": "sub",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.98,
+          "reason": "Field ownerSub matched 2/2 observed identity attribute values for sub; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": true
+        }
+      ],
+      "detail_endpoint": "/profiles/secrets/{secret_ref}"
+    }
+  ],
   "notes": [
     "Generated from the static security model. A human should confirm list_endpoint, items_path, id_field and ownership fields before using it against a real target.",
     "If owner_fields is empty, ProofSec can still propose fields dynamically by correlating responses with identity.attributes.",

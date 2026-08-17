@@ -88,6 +88,35 @@ class ProofSecDiscoveryPlanTests(unittest.TestCase):
         self.assertEqual(notes.id_field, "noteKey")
         self.assertEqual(projects.id_field, "projectCode")
 
+    def test_response_shape_detects_graph_edges_nodes_entries_and_maps(self):
+        assets = infer_response_shape(
+            "assets",
+            {
+                "edges": [
+                    {"node": {"assetCode": "AS-A", "binding": {"tenantRef": "tenant-red"}}},
+                    {"node": {"assetCode": "AS-B", "binding": {"tenantRef": "tenant-blue"}}},
+                ]
+            },
+            has_detail_endpoint=True,
+        )
+        secrets = infer_response_shape(
+            "secrets",
+            {"collection": {"entries": [{"secretRef": "SEC-A", "ownerSub": "usr-a"}, {"secretRef": "SEC-B", "ownerSub": "usr-b"}]}},
+            has_detail_endpoint=True,
+        )
+        cases = infer_response_shape(
+            "cases",
+            {"payload": {"byId": {"CASE-A": {"caseRef": "CASE-A"}, "CASE-B": {"caseRef": "CASE-B"}}}},
+            has_detail_endpoint=True,
+        )
+
+        self.assertEqual(assets.items_path, "edges.node")
+        self.assertEqual(assets.id_field, "assetCode")
+        self.assertEqual(secrets.items_path, "collection.entries")
+        self.assertEqual(secrets.id_field, "secretRef")
+        self.assertEqual(cases.items_path, "payload.byId")
+        self.assertEqual(cases.id_field, "caseRef")
+
     def test_runtime_discovery_enhances_shape_and_ownership_fields(self):
         class ContentHandler(BaseHTTPRequestHandler):
             def log_message(self, format, *args):
@@ -176,6 +205,172 @@ class ProofSecDiscoveryPlanTests(unittest.TestCase):
         suggestion = payload["suggestions"][0]
         self.assertTrue(suggestion["id_candidates"])
         self.assertTrue(suggestion["owner_field_suggestions"])
+
+    def test_runtime_discovery_resolves_identity_path_variables(self):
+        seen_paths = []
+
+        class TenantHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                seen_paths.append(self.path)
+                auth = self.headers.get("Authorization", "")
+                body = (
+                    {"content": [{"recordKey": "REC-B", "scope": {"tenant": "TEN-B"}}]}
+                    if auth.endswith("bravo")
+                    else {"content": [{"recordKey": "REC-A", "scope": {"tenant": "TEN-A"}}]}
+                )
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(body).encode())
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), TenantHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                model = ProjectSecurityModel(
+                    project_path="/workspace/demo",
+                    framework="spring-boot",
+                    endpoints=[
+                        EndpointNode(
+                            method="GET",
+                            path="/v3/workspaces/{tenant}/records",
+                            controller="RecordController",
+                            handler="list",
+                            file="RecordController.java",
+                            line=10,
+                            resource="records",
+                            action="read",
+                            parameters=("tenant",),
+                        ),
+                        EndpointNode(
+                            method="GET",
+                            path="/v3/workspaces/{tenant}/records/{recordKey}",
+                            controller="RecordController",
+                            handler="detail",
+                            file="RecordController.java",
+                            line=20,
+                            resource="records",
+                            action="read",
+                            parameters=("recordKey", "tenant"),
+                        ),
+                    ],
+                )
+                model_path = root / "model.json"
+                runtime_path = root / "runtime.json"
+                output_path = root / "discovery.json"
+                model.write_json(model_path)
+                runtime_path.write_text(
+                    json.dumps(
+                        {
+                            "target": {"base_url": f"http://127.0.0.1:{server.server_port}", "authorized": True},
+                            "identities": {
+                                "alpha": {
+                                    "role": "MEMBER",
+                                    "attributes": {"tenant_id": "TEN-A"},
+                                    "auth": {"type": "bearer", "token": "token-alpha"},
+                                },
+                                "bravo": {
+                                    "role": "MEMBER",
+                                    "attributes": {"tenant_id": "TEN-B"},
+                                    "auth": {"type": "bearer", "token": "token-bravo"},
+                                },
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = write_discovery_config_suggestions_with_runtime(model_path, runtime_path, output_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        entry = payload["discovery"]["records"]
+        self.assertEqual(entry["list_endpoint"], "/v3/workspaces/{tenant}/records")
+        self.assertEqual(entry["detail_endpoint"], "/v3/workspaces/{tenant}/records/{recordKey}")
+        self.assertEqual(entry["items_path"], "content")
+        self.assertEqual(entry["id_field"], "recordKey")
+        self.assertIn("/v3/workspaces/TEN-A/records", seen_paths)
+        self.assertIn("/v3/workspaces/TEN-B/records", seen_paths)
+
+    def test_runtime_discovery_bootstraps_from_openapi_when_static_model_is_empty(self):
+        class OpenApiHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                if self.path == "/openapi.json":
+                    body = {
+                        "openapi": "3.0.0",
+                        "paths": {
+                            "/gateway/assets": {"get": {"operationId": "listAssets"}},
+                            "/gateway/assets/{asset_code}": {
+                                "get": {
+                                    "operationId": "getAsset",
+                                    "parameters": [{"name": "asset_code", "in": "path"}],
+                                }
+                            },
+                        },
+                    }
+                else:
+                    auth = self.headers.get("Authorization", "")
+                    body = (
+                        {"edges": [{"node": {"assetCode": "AS-B", "binding": {"tenantRef": "tenant-blue"}}}]}
+                        if auth.endswith("bravo")
+                        else {"edges": [{"node": {"assetCode": "AS-A", "binding": {"tenantRef": "tenant-red"}}}]}
+                    )
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(body).encode())
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), OpenApiHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                model = ProjectSecurityModel(project_path="/workspace/fastapi", framework="unknown")
+                model_path = root / "model.json"
+                runtime_path = root / "runtime.json"
+                output_path = root / "discovery.json"
+                model.write_json(model_path)
+                runtime_path.write_text(
+                    json.dumps(
+                        {
+                            "target": {"base_url": f"http://127.0.0.1:{server.server_port}", "authorized": True},
+                            "identities": {
+                                "alpha": {
+                                    "role": "ANALYST",
+                                    "attributes": {"tenant": "tenant-red"},
+                                    "auth": {"type": "bearer", "token": "token-alpha"},
+                                },
+                                "bravo": {
+                                    "role": "ANALYST",
+                                    "attributes": {"tenant": "tenant-blue"},
+                                    "auth": {"type": "bearer", "token": "token-bravo"},
+                                },
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = write_discovery_config_suggestions_with_runtime(model_path, runtime_path, output_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertIn("assets", payload["discovery"])
+        entry = payload["discovery"]["assets"]
+        self.assertEqual(entry["list_endpoint"], "/gateway/assets")
+        self.assertEqual(entry["detail_endpoint"], "/gateway/assets/{asset_code}")
+        self.assertEqual(entry["items_path"], "edges.node")
+        self.assertEqual(entry["id_field"], "assetCode")
+        self.assertIn("binding.tenantRef", entry["owner_fields"])
 
     def test_infers_versioned_and_assigned_resource_names(self):
         self.assertEqual(infer_resource("/api/v2/portfolio/clients"), "clients")

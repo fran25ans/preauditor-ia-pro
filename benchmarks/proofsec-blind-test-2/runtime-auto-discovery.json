@@ -39,6 +39,7 @@
   "discovery": {
     "caseboard": {
       "list_endpoint": "/internal/caseboard/mine",
+      "detail_endpoint": "/internal/caseboard/{caseRef}",
       "items_path": "",
       "id_field": null,
       "owner_fields": [],
@@ -54,6 +55,7 @@
     },
     "documents": {
       "list_endpoint": "/api/vault/documents",
+      "detail_endpoint": "/api/vault/documents/{docRef}",
       "items_path": "_embedded.documents",
       "id_field": "docRef",
       "owner_fields": [
@@ -61,6 +63,27 @@
       ],
       "owner_marker_fields": [
         "permissions.ownerSubject",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "records": {
+      "list_endpoint": "/v3/workspaces/{tenant}/records",
+      "detail_endpoint": "/v3/workspaces/{tenant}/records/{recordKey}",
+      "items_path": "data",
+      "id_field": "recordKey",
+      "owner_fields": [
+        "scope.custodian.memberRef",
+        "scope.tenant"
+      ],
+      "owner_marker_fields": [
+        "scope.custodian.memberRef",
+        "scope.tenant",
         "owner",
         "owner.id",
         "advisor.id",

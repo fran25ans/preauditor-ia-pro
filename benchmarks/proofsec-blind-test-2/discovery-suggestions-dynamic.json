@@ -4,6 +4,7 @@
   "discovery": {
     "caseboard": {
       "list_endpoint": "/internal/caseboard/mine",
+      "detail_endpoint": "/internal/caseboard/{caseRef}",
       "items_path": "",
       "id_field": null,
       "owner_fields": [],
@@ -19,6 +20,7 @@
     },
     "documents": {
       "list_endpoint": "/api/vault/documents",
+      "detail_endpoint": "/api/vault/documents/{docRef}",
       "items_path": "_embedded.documents",
       "id_field": "docRef",
       "owner_fields": [
@@ -26,6 +28,27 @@
       ],
       "owner_marker_fields": [
         "permissions.ownerSubject",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "records": {
+      "list_endpoint": "/v3/workspaces/{tenant}/records",
+      "detail_endpoint": "/v3/workspaces/{tenant}/records/{recordKey}",
+      "items_path": "data",
+      "id_field": "recordKey",
+      "owner_fields": [
+        "scope.custodian.memberRef",
+        "scope.tenant"
+      ],
+      "owner_marker_fields": [
+        "scope.custodian.memberRef",
+        "scope.tenant",
         "owner",
         "owner.id",
         "advisor.id",
@@ -59,7 +82,8 @@
       ],
       "shape_reason": "No list-like collection was found in the response. ID field candidate: UNKNOWN.",
       "id_candidates": [],
-      "owner_field_suggestions": []
+      "owner_field_suggestions": [],
+      "detail_endpoint": "/internal/caseboard/{caseRef}"
     },
     {
       "resource": "documents",
@@ -79,7 +103,7 @@
         "assignedTo",
         "createdBy"
       ],
-      "confidence": 0.9,
+      "confidence": 0.92,
       "reason": "GET /api/vault/documents looks like a collection endpoint for documents; confirm response shape and ownership fields before dynamic testing.",
       "related_detail_endpoints": [
         "GET /api/vault/documents/{docRef}"
@@ -88,8 +112,8 @@
       "id_candidates": [
         {
           "field": "docRef",
-          "confidence": 0.74,
-          "reason": "field name looks like a stable resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "confidence": 0.99,
+          "reason": "field name matches the detail endpoint path parameter; field name looks like a stable resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
           "present_ratio": 1.0,
           "unique_ratio": 1.0
         },
@@ -97,6 +121,13 @@
           "field": "name",
           "confidence": 0.54,
           "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "permissions.ownerSubject",
+          "confidence": 0.36,
+          "reason": "field looks more like ownership than resource identity; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
           "present_ratio": 1.0,
           "unique_ratio": 1.0
         }
@@ -114,7 +145,99 @@
           "ambiguous_matches": 0,
           "semantic_match": true
         }
-      ]
+      ],
+      "detail_endpoint": "/api/vault/documents/{docRef}"
+    },
+    {
+      "resource": "records",
+      "list_endpoint": "/v3/workspaces/{tenant}/records",
+      "items_path": "data",
+      "id_field": "recordKey",
+      "owner_fields": [
+        "scope.custodian.memberRef",
+        "scope.tenant"
+      ],
+      "owner_marker_fields": [
+        "scope.custodian.memberRef",
+        "scope.tenant",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ],
+      "confidence": 0.98,
+      "reason": "GET /v3/workspaces/{tenant}/records looks like a collection endpoint for records; confirm response shape and ownership fields before dynamic testing.",
+      "related_detail_endpoints": [
+        "GET /v3/workspaces/{tenant}/records/{recordKey}"
+      ],
+      "shape_reason": "Detected data as the most likely collection with 2 item(s). ID field candidate: recordKey.",
+      "id_candidates": [
+        {
+          "field": "recordKey",
+          "confidence": 0.99,
+          "reason": "field name matches the detail endpoint path parameter; field name matches the resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "id",
+          "confidence": 0.86,
+          "reason": "field name is a canonical id; generic id does not match the detail endpoint path parameter; field name ends with id; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "scope.custodian.memberRef",
+          "confidence": 0.74,
+          "reason": "field name looks like a stable resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "attributes.classification",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "attributes.title",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        }
+      ],
+      "owner_field_suggestions": [
+        {
+          "resource": "records",
+          "field": "scope.custodian.memberRef",
+          "identity_attribute": "member_ref",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.9,
+          "reason": "Field scope.custodian.memberRef matched 2/2 observed identity attribute values for member_ref; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": false
+        },
+        {
+          "resource": "records",
+          "field": "scope.tenant",
+          "identity_attribute": "tenant_id",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.9,
+          "reason": "Field scope.tenant matched 2/2 observed identity attribute values for tenant_id; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": false
+        }
+      ],
+      "detail_endpoint": "/v3/workspaces/{tenant}/records/{recordKey}"
     }
   ],
   "notes": [

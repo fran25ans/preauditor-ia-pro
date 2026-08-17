@@ -36,5 +36,67 @@
       }
     }
   },
-  "discovery": {}
+  "discovery": {
+    "assets": {
+      "list_endpoint": "/gateway/assets",
+      "detail_endpoint": "/gateway/assets/{asset_code}",
+      "items_path": "edges.node",
+      "id_field": "assetCode",
+      "owner_fields": [
+        "binding.principal.id",
+        "binding.tenantRef"
+      ],
+      "owner_marker_fields": [
+        "binding.principal.id",
+        "binding.tenantRef",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "reports": {
+      "list_endpoint": "/api/reports",
+      "detail_endpoint": "/api/reports/{report_id}",
+      "items_path": "data",
+      "id_field": "report_id",
+      "owner_fields": [
+        "acl.owner",
+        "relationships.acl.data.owner"
+      ],
+      "owner_marker_fields": [
+        "acl.owner",
+        "relationships.acl.data.owner",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "secrets": {
+      "list_endpoint": "/profiles/secrets",
+      "detail_endpoint": "/profiles/secrets/{secret_ref}",
+      "items_path": "collection.entries",
+      "id_field": "secretRef",
+      "owner_fields": [
+        "ownerSub"
+      ],
+      "owner_marker_fields": [
+        "ownerSub",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    }
+  }
 }
