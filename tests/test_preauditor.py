@@ -6,7 +6,7 @@ import threading
 import unittest
 import zipfile
 from pathlib import Path
-from http.server import ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -24,6 +24,7 @@ from proofsec.invariants import (
 )
 from proofsec.llm.invariant_suggestions import suggest_invariants_with_llm
 from proofsec.llm.ollama import parse_json_object
+from proofsec.attack_engine import retest_proof, run_bola_tests
 
 
 class PreauditorRuleTests(unittest.TestCase):
@@ -932,6 +933,152 @@ public class CustomerController {
         self.assertEqual(payload["status_counts"]["proposed"], 1)
         self.assertEqual(payload["readiness_counts"]["needs_confirmation"], 1)
         self.assertEqual(payload["invariants"][0]["name"], "advisor_can_only_access_assigned_customers")
+
+    def write_proofsec_runtime_files(self, root: Path, base_url: str) -> tuple[Path, Path, Path, str]:
+        self.write_spring_demo(root)
+        model = build_security_model(root)
+        contract = propose_security_contract(model)
+        invariant_id = contract.invariants[0].invariant_id
+        contract = update_invariant_status(contract, invariant_id, "confirmed")
+        model_path = root / "model.json"
+        contract_path = root / "contract.json"
+        config_path = root / "proofsec-runtime.json"
+        model.write_json(model_path)
+        contract.write_json(contract_path)
+        config_path.write_text(
+            preauditor.json.dumps(
+                {
+                    "target": {
+                        "base_url": base_url,
+                        "authorized": True,
+                        "max_requests": 5,
+                        "timeout_seconds": 3,
+                    },
+                    "identities": {
+                        "advisor_a": {
+                            "role": "ADVISOR",
+                            "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                        },
+                        "advisor_b": {
+                            "role": "ADVISOR",
+                            "auth": {"type": "bearer", "token": "test-token-advisor-b"},
+                        },
+                    },
+                    "resources": {
+                        "customer_101": {
+                            "resource": "customers",
+                            "id": "101",
+                            "owner_identity": "advisor_a",
+                        },
+                        "customer_202": {
+                            "resource": "customers",
+                            "id": "202",
+                            "owner_identity": "advisor_b",
+                        },
+                    },
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        return model_path, contract_path, config_path, invariant_id
+
+    def run_customer_server(self, secure: bool):
+        class CustomerHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                authorization = self.headers.get("Authorization", "")
+                cross_owner = (
+                    (authorization.endswith("advisor-a") and self.path == "/api/customers/202")
+                    or (authorization.endswith("advisor-b") and self.path == "/api/customers/101")
+                )
+                if cross_owner and secure:
+                    self.send_response(403)
+                    self.end_headers()
+                    self.wfile.write(b'{"error":"forbidden"}')
+                    return
+                if self.path in {"/api/customers/101", "/api/customers/202"}:
+                    customer_id = self.path.rsplit("/", 1)[-1]
+                    owner = "advisor_b" if customer_id == "202" else "advisor_a"
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(f'{{"id":"{customer_id}","owner":"{owner}","email":"customer{customer_id}@example.test"}}'.encode())
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), CustomerHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server
+
+    def test_proofsec_bola_engine_generates_real_proven_security_proof(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                model_path, contract_path, config_path, invariant_id = self.write_proofsec_runtime_files(root, base_url)
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 2)
+        proof = payload["proofs"][0]
+        self.assertEqual(proof["invariant_id"], invariant_id)
+        self.assertEqual(proof["finding_state"], "PROVEN")
+        self.assertEqual(proof["exploitability"], "PROVEN")
+        self.assertEqual(proof["expected"], "403 Forbidden or equivalent denial")
+        self.assertEqual(proof["actual"], "200")
+        self.assertIn("SECURITY INVARIANT VIOLATED", proof["conclusion"])
+        self.assertIn("Authorization", proof["evidence"]["request_headers"])
+        self.assertEqual(proof["evidence"]["request_headers"]["Authorization"], "Bearer ****")
+        self.assertNotIn("test-token-advisor-a", preauditor.json.dumps(proof))
+        self.assertIn("repository.findById", proof["suggested_fix"])
+        self.assertIn("andExpect(status().isForbidden())", proof["regression_test"])
+
+    def test_proofsec_dynamic_engine_requires_explicit_authorization(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            model_path, contract_path, config_path, _ = self.write_proofsec_runtime_files(root, "http://127.0.0.1:1")
+            config = preauditor.json.loads(config_path.read_text(encoding="utf-8"))
+            config["target"]["authorized"] = False
+            config_path.write_text(preauditor.json.dumps(config), encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                run_bola_tests(model_path, contract_path, config_path)
+
+    def test_proofsec_retest_marks_fixed_when_original_attack_is_denied(self):
+        vulnerable = self.run_customer_server(secure=False)
+        fixed = None
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                base_url = f"http://127.0.0.1:{vulnerable.server_port}"
+                model_path, contract_path, config_path, _ = self.write_proofsec_runtime_files(root, base_url)
+                first_payload = run_bola_tests(model_path, contract_path, config_path)
+                proof_path = root / "proofs.json"
+                proof_path.write_text(preauditor.json.dumps(first_payload), encoding="utf-8")
+                vulnerable.shutdown()
+                vulnerable.server_close()
+                fixed = self.run_customer_server(secure=True)
+                config = preauditor.json.loads(config_path.read_text(encoding="utf-8"))
+                config["target"]["base_url"] = f"http://127.0.0.1:{fixed.server_port}"
+                config_path.write_text(preauditor.json.dumps(config), encoding="utf-8")
+                retest_payload = retest_proof(model_path, contract_path, config_path, proof_path)
+        finally:
+            if fixed:
+                fixed.shutdown()
+                fixed.server_close()
+
+        self.assertEqual(first_payload["kpis"]["proven_vulnerabilities"], 2)
+        self.assertEqual(retest_payload["kpis"]["fixed_vulnerabilities"], 2)
+        self.assertEqual(retest_payload["proofs"][0]["finding_state"], "FIXED")
+        self.assertIn("FIX VERIFIED", retest_payload["proofs"][0]["conclusion"])
 
 
 if __name__ == "__main__":

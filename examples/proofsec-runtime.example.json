@@ -1,0 +1,37 @@
+{
+  "target": {
+    "base_url": "http://127.0.0.1:8080",
+    "authorized": true,
+    "max_requests": 10,
+    "timeout_seconds": 5,
+    "rate_limit_seconds": 0
+  },
+  "identities": {
+    "advisor_a": {
+      "role": "ADVISOR",
+      "auth": {
+        "type": "bearer",
+        "token_env": "TOKEN_ADVISOR_A"
+      }
+    },
+    "advisor_b": {
+      "role": "ADVISOR",
+      "auth": {
+        "type": "bearer",
+        "token_env": "TOKEN_ADVISOR_B"
+      }
+    }
+  },
+  "resources": {
+    "customer_101": {
+      "resource": "customers",
+      "id": "101",
+      "owner_identity": "advisor_a"
+    },
+    "customer_202": {
+      "resource": "customers",
+      "id": "202",
+      "owner_identity": "advisor_b"
+    }
+  }
+}

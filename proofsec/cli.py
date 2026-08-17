@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 import sys
 
+from proofsec.attack_engine import retest_proof, run_bola_tests, write_proofs
 from proofsec.contract import load_security_model, merge_invariants, propose_security_contract, write_contract
 from proofsec.invariants import (
     confirm_all_proposed,
@@ -51,6 +52,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     invariants.add_argument("--confirm", action="append", default=[], help="Confirm an invariant by id. Can be repeated.")
     invariants.add_argument("--reject", action="append", default=[], help="Reject an invariant by id. Can be repeated.")
     invariants.add_argument("--confirm-all", action="store_true", help="Confirm all proposed invariants.")
+
+    test = subparsers.add_parser("test", help="Run safe dynamic validation against an authorized target.")
+    test.add_argument("--type", choices=["bola"], default="bola", help="Dynamic test family to execute.")
+    test.add_argument("--model", required=True, help="ProofSec security model JSON.")
+    test.add_argument("--contract", required=True, help="Security Contract JSON with confirmed invariants.")
+    test.add_argument("--config", required=True, help="Authorized runtime config JSON with target, identities and resources.")
+    test.add_argument("--out", default="security-proofs.json", help="Security Proof JSON output path.")
+
+    retest = subparsers.add_parser("retest", help="Repeat a previous ProofSec proof after a fix.")
+    retest.add_argument("--proof", required=True, help="Previous Security Proof JSON.")
+    retest.add_argument("--model", required=True, help="ProofSec security model JSON.")
+    retest.add_argument("--contract", required=True, help="Security Contract JSON with confirmed invariants.")
+    retest.add_argument("--config", required=True, help="Authorized runtime config JSON.")
+    retest.add_argument("--out", default="security-retest.json", help="Retest output path.")
 
     return parser.parse_args(argv)
 
@@ -159,6 +174,50 @@ def command_invariants(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_test(args: argparse.Namespace) -> int:
+    try:
+        if args.type != "bola":
+            print("ProofSec currently supports only --type bola.", file=sys.stderr)
+            return 2
+        payload = run_bola_tests(Path(args.model), Path(args.contract), Path(args.config))
+        output = Path(args.out)
+        write_proofs(payload, output)
+    except Exception as exc:
+        print(f"ProofSec test failed: {exc}", file=sys.stderr)
+        return 2
+
+    print("ProofSec dynamic validation completed")
+    print(f"Tests executed: {payload['kpis']['tests_executed']}")
+    print(f"Proven vulnerabilities: {payload['kpis']['proven_vulnerabilities']}")
+    print(f"Fixed vulnerabilities: {payload['kpis']['fixed_vulnerabilities']}")
+    print(f"Inconclusive: {payload['kpis']['inconclusive']}")
+    if payload["kpis"]["proven_vulnerabilities"]:
+        print("SECURITY INVARIANT VIOLATED")
+        print("Exploitability: PROVEN")
+        print("Evidence: Captured")
+    print(f"Security proofs: {output.expanduser().resolve()}")
+    return 0
+
+
+def command_retest(args: argparse.Namespace) -> int:
+    try:
+        payload = retest_proof(Path(args.model), Path(args.contract), Path(args.config), Path(args.proof))
+        output = Path(args.out)
+        write_proofs(payload, output)
+    except Exception as exc:
+        print(f"ProofSec retest failed: {exc}", file=sys.stderr)
+        return 2
+
+    print("ProofSec retest completed")
+    print(f"Tests executed: {payload['kpis']['tests_executed']}")
+    print(f"Proven vulnerabilities: {payload['kpis']['proven_vulnerabilities']}")
+    print(f"Fixed vulnerabilities: {payload['kpis']['fixed_vulnerabilities']}")
+    if payload["kpis"]["fixed_vulnerabilities"]:
+        print("FIX VERIFIED")
+    print(f"Retest evidence: {output.expanduser().resolve()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.command == "analyze":
@@ -167,7 +226,11 @@ def main(argv: list[str] | None = None) -> int:
         return command_contract(args)
     if args.command == "invariants":
         return command_invariants(args)
-    print("Use one of: analyze, contract, invariants", file=sys.stderr)
+    if args.command == "test":
+        return command_test(args)
+    if args.command == "retest":
+        return command_retest(args)
+    print("Use one of: analyze, contract, invariants, test, retest", file=sys.stderr)
     return 2
 
 

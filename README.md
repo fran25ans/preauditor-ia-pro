@@ -271,7 +271,7 @@ La UI móvil es local y escucha solo en `127.0.0.1`.
 
 ProofSec es la evolución orientada a demostrar explotabilidad real en entornos autorizados. El objetivo es pasar de hallazgos potenciales a pruebas reproducibles basadas en invariantes de seguridad.
 
-La primera fase disponible construye un modelo de seguridad local de aplicaciones Spring Boot REST:
+Construye un modelo de seguridad local de aplicaciones Spring Boot REST:
 
 ```bash
 proofsec analyze ./demo-app \
@@ -280,7 +280,7 @@ proofsec analyze ./demo-app \
   --sqlite deliverables/proofsec/proofsec.sqlite
 ```
 
-Esta fase detecta endpoints, roles, recursos y relaciones básicas `Role -> Endpoint -> Resource`. No ejecuta ataques dinámicos todavía.
+Esta fase detecta endpoints, roles, recursos y relaciones básicas `Role -> Endpoint -> Resource`.
 
 También puede generar un **Security Contract** inicial para revisión humana:
 
@@ -319,14 +319,95 @@ proofsec invariants \
   --out deliverables/proofsec/invariant-state.json
 ```
 
-El motor de invariantes permite pasar de `proposed` a `confirmed` o `rejected`. Los estados `testing`, `respected` y `violated` quedan reservados para fases posteriores con evidencia dinámica real.
+El motor de invariantes permite pasar de `proposed` a `confirmed` o `rejected`. Solo las invariantes confirmadas por una persona pueden alimentar pruebas dinámicas.
+
+### Pruebas dinámicas BOLA/IDOR
+
+Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autorizado, identidades de prueba y recursos de ejemplo. Los tokens pueden venir de variables de entorno y nunca se escriben completos en las evidencias:
+
+```json
+{
+  "target": {
+    "base_url": "http://127.0.0.1:8080",
+    "authorized": true,
+    "max_requests": 10,
+    "timeout_seconds": 5
+  },
+  "identities": {
+    "advisor_a": {
+      "role": "ADVISOR",
+      "auth": {
+        "type": "bearer",
+        "token_env": "TOKEN_ADVISOR_A"
+      }
+    },
+    "advisor_b": {
+      "role": "ADVISOR",
+      "auth": {
+        "type": "bearer",
+        "token_env": "TOKEN_ADVISOR_B"
+      }
+    }
+  },
+  "resources": {
+    "customer_101": {
+      "resource": "customers",
+      "id": "101",
+      "owner_identity": "advisor_a"
+    },
+    "customer_202": {
+      "resource": "customers",
+      "id": "202",
+      "owner_identity": "advisor_b"
+    }
+  }
+}
+```
+
+Ejecuta el test BOLA:
+
+```bash
+proofsec test \
+  --type bola \
+  --model deliverables/proofsec/security-model.json \
+  --contract deliverables/proofsec/security-contract-reviewed.json \
+  --config proofsec-runtime.json \
+  --out deliverables/proofsec/security-proofs.json
+```
+
+Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`:
+
+```text
+SECURITY INVARIANT VIOLATED
+Exploitability: PROVEN
+Evidence: Captured
+```
+
+El proof incluye request/response redactados, identidad abstracta, recurso, owner esperado, resultado real, código afectado aproximado, propuesta de fix y test de regresión MockMvc conceptual.
+
+### Retest después del fix
+
+Tras corregir el código, repite exactamente la prueba:
+
+```bash
+proofsec retest \
+  --proof deliverables/proofsec/security-proofs.json \
+  --model deliverables/proofsec/security-model.json \
+  --contract deliverables/proofsec/security-contract-reviewed.json \
+  --config proofsec-runtime.json \
+  --out deliverables/proofsec/security-retest.json
+```
+
+Si el acceso que antes devolvía `200` ahora devuelve `401`, `403` o `404`, el finding se marca como `FIXED` y conserva el histórico de la evidencia anterior.
 
 Principios de ProofSec:
 
 - funcionamiento local/offline siempre que sea posible
 - ningún finding se marca como `PROVEN` sin evidencia dinámica real
-- las pruebas ofensivas futuras requerirán target autorizado explícitamente
-- tokens, cookies y secretos deberán redactarse siempre en evidencias e informes
+- las pruebas dinámicas requieren `target.authorized: true`
+- por defecto solo se permiten targets `localhost` o `127.0.0.1`
+- solo se ejecutan pruebas de lectura para BOLA/IDOR
+- tokens, cookies y secretos se redactan siempre en evidencias e informes
 
 ## Qué detecta
 

@@ -13,7 +13,7 @@
 - `preauditor_ui.py`: interfaz web local.
 - `mobile_release_radar.py`: comparador de releases moviles Android/iOS.
 - `mobile_release_ui.py`: interfaz web local para Mobile Release Radar.
-- `proofsec/`: nueva base ProofSec para modelo de seguridad e invariantes.
+- `proofsec/`: base ProofSec para modelo de seguridad, invariantes, BOLA dinámico, Security Proof y retest.
 - `README.md`: documentacion de uso.
 - `install.sh`: instalador local.
 - `dist/preauditor_ia-0.1.0-py3-none-any.whl`: paquete instalable.
@@ -35,7 +35,8 @@ mobile-release-radar /Users/franciscojosegimenoesteban/Downloads/85.apk --histor
 proofsec analyze ./examples/proofsec-spring-demo --out deliverables/proofsec/security-model.json
 proofsec contract ./examples/proofsec-spring-demo --out deliverables/proofsec/security-contract.yml
 proofsec contract ./examples/proofsec-spring-demo --out deliverables/proofsec/security-contract.json
-proofsec invariants --contract deliverables/proofsec/security-contract.json --model deliverables/proofsec/security-model.json --out deliverables/proofsec/invariant-state.json
+proofsec invariants --contract deliverables/proofsec/security-contract.json --model deliverables/proofsec/security-model.json --confirm-all --updated-contract deliverables/proofsec/security-contract-reviewed.json --out deliverables/proofsec/invariant-state.json
+proofsec test --type bola --model deliverables/proofsec/security-model.json --contract deliverables/proofsec/security-contract-reviewed.json --config examples/proofsec-runtime.example.json --out deliverables/proofsec/security-proofs.json
 preauditor ./sample-vulnerable --profile pro --ollama --fail-on never
 preauditor ./sample-vulnerable --profile pro --rules-file examples/custom-rules.yml --fail-on never
 python3 -m unittest discover -s tests

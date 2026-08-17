@@ -21,6 +21,8 @@ EdgeType = Literal[
 ContractSource = Literal["detected", "inferred", "user-confirmed"]
 ContractStatus = Literal["proposed", "confirmed", "rejected"]
 InvariantStatus = Literal["proposed", "confirmed", "rejected", "testing", "respected", "violated", "unknown"]
+Exploitability = Literal["UNVERIFIED", "PROVEN", "FIXED", "UNKNOWN"]
+FindingState = Literal["POTENTIAL", "LIKELY", "PROVEN", "FALSE_POSITIVE", "FIXED"]
 
 
 def utc_now() -> str:
@@ -225,3 +227,71 @@ class SecurityContract:
             "invariants": len(self.invariants),
             "confirmed_invariants": sum(1 for invariant in self.invariants if invariant.status == "confirmed"),
         }
+
+
+@dataclass(frozen=True)
+class ProofSecIdentity:
+    name: str
+    role: str
+    auth_type: str = "none"
+    token_env: str = ""
+    token_value: str = ""
+
+
+@dataclass(frozen=True)
+class ProofSecResourceExample:
+    name: str
+    resource: str
+    resource_id: str
+    owner_identity: str
+    sensitive_markers: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ProofSecTarget:
+    base_url: str
+    authorized: bool
+    allow_non_local: bool = False
+    dry_run: bool = False
+    max_requests: int = 20
+    timeout_seconds: float = 5.0
+    rate_limit_seconds: float = 0.0
+
+
+@dataclass(frozen=True)
+class HttpExchangeEvidence:
+    method: str
+    url: str
+    request_headers: dict[str, str]
+    status: int | None
+    response_headers: dict[str, str]
+    response_body_preview: str
+    error: str = ""
+
+
+@dataclass(frozen=True)
+class SecurityProof:
+    proof_id: str
+    finding_state: FindingState
+    invariant_id: str
+    invariant_name: str
+    vulnerability: str
+    severity: str
+    confidence: float
+    exploitability: Exploitability
+    expected: str
+    actual: str
+    identity: str
+    resource: str
+    resource_owner: str
+    endpoint: str
+    classification: str
+    conclusion: str
+    evidence: HttpExchangeEvidence
+    affected_code: str
+    suggested_fix: str
+    regression_test: str
+    generated_at: str = field(default_factory=utc_now)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
