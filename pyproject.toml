@@ -40,4 +40,4 @@ proofsec-ui = "proofsec_ui:main"
 
 [tool.setuptools]
 py-modules = ["preauditor", "preauditor_ui", "mobile_release_radar", "mobile_release_ui", "proofsec_ui"]
-packages = ["proofsec", "proofsec.discovery", "proofsec.llm"]
+packages = ["proofsec", "proofsec.discovery", "proofsec.http", "proofsec.llm"]

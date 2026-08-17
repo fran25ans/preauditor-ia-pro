@@ -19,6 +19,8 @@
 - Endurece BFLA/privilege con marcadores funcionales configurables: `HTTP 2xx` sin evidencia de ejecución queda como `VALIDATED`, no `PROVEN`.
 - Añade sugerencias automáticas de campos de ownership al correlacionar respuestas de discovery con atributos de identidad.
 - Separa el cliente HTTP dinámico en `proofsec/http/client.py` para reducir acoplamiento entre discovery y attack engine.
+- Añade `proofsec discovery` para proponer configuración inicial de Resource Discovery desde el Security Model.
+- Añade tests específicos en `tests/proofsec_tests/` para discovery plan y correlación de ownership.
 
 ## 0.2.0
 

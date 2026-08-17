@@ -336,6 +336,34 @@ proofsec invariants \
 
 El motor de invariantes permite pasar de `proposed` a `confirmed` o `rejected`. Solo las invariantes confirmadas por una persona pueden alimentar pruebas dinámicas.
 
+### Propuesta automática de discovery
+
+ProofSec puede proponer una plantilla inicial de discovery desde el Security Model, para que no tengas que escribir a mano todos los endpoints de listado:
+
+```bash
+proofsec discovery \
+  --model deliverables/proofsec/security-model.json \
+  --out deliverables/proofsec/discovery-suggestions.json
+```
+
+Ejemplo de salida sugerida:
+
+```json
+{
+  "discovery": {
+    "customers": {
+      "list_endpoint": "/api/customers",
+      "items_path": "data",
+      "id_field": "id",
+      "owner_fields": [],
+      "owner_marker_fields": ["owner", "owner.id", "advisor.id", "advisorId", "managerId", "assignedTo", "createdBy"]
+    }
+  }
+}
+```
+
+Estas sugerencias no se aceptan como verdad absoluta: sirven como borrador revisable. Después, durante el discovery dinámico, ProofSec puede completar `owner_fields` correlacionando respuestas reales con `identity.attributes`.
+
 ### Pruebas dinámicas BOLA/IDOR
 
 Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autorizado e identidades de prueba. Los tokens pueden venir de variables de entorno y nunca se escriben completos en las evidencias.

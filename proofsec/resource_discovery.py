@@ -7,7 +7,11 @@ from typing import Any
 
 from proofsec.http.client import run_http_request
 from proofsec.models import ProofSecIdentity, ProofSecResourceExample, ProofSecTarget
-from proofsec.ownership_suggestions import OwnershipFieldSuggestion, suggest_owner_fields_for_item
+from proofsec.ownership_suggestions import (
+    OwnershipFieldSuggestion,
+    suggest_owner_fields_for_item,
+    suggest_owner_fields_from_observations,
+)
 from proofsec.runtime_config import auth_headers
 
 
@@ -83,6 +87,7 @@ def discover_resources_with_suggestions(
         configured_owner_fields = tuple(str(item) for item in raw.get("owner_fields", []))
         if not list_endpoint.startswith("/"):
             continue
+        observations: list[tuple[dict[str, Any], ProofSecIdentity]] = []
         for identity in identities.values():
             url = target.base_url.rstrip("/") + list_endpoint
             evidence = run_http_request(target, "GET", url, auth_headers(identity))
@@ -98,24 +103,31 @@ def discover_resources_with_suggestions(
                 resource_id = value_at_path(item, id_field)
                 if resource_id is None:
                     continue
-                resource_id_text = normalize(resource_id)
                 item_suggestions = suggest_owner_fields_for_item(resource_name, item, identity, identities)
                 suggestions.extend(item_suggestions)
-                suggested_fields = tuple(suggestion.field for suggestion in item_suggestions if suggestion.confidence >= 0.9)
-                owner_fields = configured_owner_fields or tuple(dict.fromkeys([*suggested_fields, *marker_fields]))
-                owner_identity, ownership_source, ownership_confidence = owner_from_item(item, owner_fields, identities)
-                discovered.append(
-                    ProofSecResourceExample(
-                        name=f"{resource_name.rstrip('s')}_{resource_id_text}",
-                        resource=resource_name,
-                        resource_id=resource_id_text,
-                        owner_identity=owner_identity,
-                        observed_by=(identity.name,),
-                        ownership_source=ownership_source,
-                        ownership_confidence=ownership_confidence,
-                        sensitive_markers=marker_from_item(item, marker_fields, identity.name),
-                    )
+                observations.append((item, identity))
+        aggregate_suggestions = suggest_owner_fields_from_observations(resource_name, observations, identities)
+        suggestions.extend(aggregate_suggestions)
+        aggregate_fields = tuple(suggestion.field for suggestion in aggregate_suggestions if suggestion.confidence >= 0.85)
+        for item, identity in observations:
+            resource_id = value_at_path(item, id_field)
+            if resource_id is None:
+                continue
+            resource_id_text = normalize(resource_id)
+            owner_fields = configured_owner_fields or tuple(dict.fromkeys([*aggregate_fields, *marker_fields]))
+            owner_identity, ownership_source, ownership_confidence = owner_from_item(item, owner_fields, identities)
+            discovered.append(
+                ProofSecResourceExample(
+                    name=f"{resource_name.rstrip('s')}_{resource_id_text}",
+                    resource=resource_name,
+                    resource_id=resource_id_text,
+                    owner_identity=owner_identity,
+                    observed_by=(identity.name,),
+                    ownership_source=ownership_source,
+                    ownership_confidence=ownership_confidence,
+                    sensitive_markers=marker_from_item(item, marker_fields, identity.name),
                 )
+            )
     merged: dict[tuple[str, str, str], ProofSecResourceExample] = {}
     for item in discovered:
         key = (item.resource, item.resource_id, item.owner_identity)

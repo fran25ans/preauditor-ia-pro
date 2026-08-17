@@ -8,6 +8,7 @@ import sys
 
 from proofsec.attack_engine import retest_proof, run_dynamic_tests, write_proofs
 from proofsec.contract import load_security_model, merge_invariants, propose_security_contract, write_contract
+from proofsec.discovery_plan import write_discovery_config_suggestions
 from proofsec.invariants import (
     confirm_all_proposed,
     evaluate_invariants,
@@ -52,6 +53,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     invariants.add_argument("--confirm", action="append", default=[], help="Confirm an invariant by id. Can be repeated.")
     invariants.add_argument("--reject", action="append", default=[], help="Reject an invariant by id. Can be repeated.")
     invariants.add_argument("--confirm-all", action="store_true", help="Confirm all proposed invariants.")
+
+    discovery = subparsers.add_parser("discovery", help="Suggest runtime resource discovery configuration from a security model.")
+    discovery.add_argument("--model", required=True, help="ProofSec security model JSON.")
+    discovery.add_argument("--out", default="proofsec-discovery-suggestions.json", help="Discovery suggestion JSON output path.")
 
     test = subparsers.add_parser("test", help="Run safe dynamic validation against an authorized target.")
     test.add_argument(
@@ -179,6 +184,24 @@ def command_invariants(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_discovery(args: argparse.Namespace) -> int:
+    try:
+        output = Path(args.out)
+        payload = write_discovery_config_suggestions(Path(args.model), output)
+    except Exception as exc:
+        print(f"ProofSec discovery failed: {exc}", file=sys.stderr)
+        return 2
+
+    suggestions = payload.get("suggestions", [])
+    print("ProofSec discovery configuration suggested")
+    print(f"Resources suggested: {len(suggestions)}")
+    for item in suggestions:
+        if isinstance(item, dict):
+            print(f"- {item.get('resource')}: {item.get('list_endpoint')} confidence={item.get('confidence')}")
+    print(f"Discovery suggestions: {output.expanduser().resolve()}")
+    return 0
+
+
 def command_test(args: argparse.Namespace) -> int:
     try:
         payload = run_dynamic_tests(Path(args.model), Path(args.contract), Path(args.config), args.type)
@@ -228,11 +251,13 @@ def main(argv: list[str] | None = None) -> int:
         return command_contract(args)
     if args.command == "invariants":
         return command_invariants(args)
+    if args.command == "discovery":
+        return command_discovery(args)
     if args.command == "test":
         return command_test(args)
     if args.command == "retest":
         return command_retest(args)
-    print("Use one of: analyze, contract, invariants, test, retest", file=sys.stderr)
+    print("Use one of: analyze, contract, invariants, discovery, test, retest", file=sys.stderr)
     return 2
 
 
