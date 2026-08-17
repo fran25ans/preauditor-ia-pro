@@ -52,12 +52,22 @@ def load_identities(config: dict) -> dict[str, ProofSecIdentity]:
         auth = raw.get("auth") or {}
         token_env = str(auth.get("token_env") or "").strip()
         token_value = os.environ.get(token_env, "") if token_env else str(auth.get("token", "") or "")
+        role = str(raw.get("role", "")).upper()
+        raw_attributes = raw.get("attributes") or {}
+        attributes = {
+            "name": str(name),
+            "identity": str(name),
+            "role": role,
+        }
+        if isinstance(raw_attributes, dict):
+            attributes.update({str(key): str(value) for key, value in raw_attributes.items() if value is not None})
         identities[name] = ProofSecIdentity(
             name=name,
-            role=str(raw.get("role", "")).upper(),
+            role=role,
             auth_type=str(auth.get("type", "none")).lower(),
             token_env=token_env,
             token_value=token_value,
+            attributes=attributes,
         )
     if not identities:
         raise ValueError("At least one test identity is required.")
@@ -73,6 +83,9 @@ def load_resource_examples(config: dict, require: bool = True) -> list[ProofSecR
                 resource=str(raw.get("resource", "")),
                 resource_id=str(raw.get("id", "")),
                 owner_identity=str(raw.get("owner_identity", "")),
+                observed_by=tuple(str(item) for item in raw.get("observed_by", [])),
+                ownership_source=str(raw.get("ownership_source", "manual")),
+                ownership_confidence=float(raw.get("ownership_confidence", 1.0)),
                 sensitive_markers=tuple(str(item) for item in raw.get("sensitive_markers", [])),
             )
         )

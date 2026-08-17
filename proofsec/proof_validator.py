@@ -64,6 +64,32 @@ def contains_error_semantics(value: Any) -> bool:
     return False
 
 
+def contains_functional_marker(value: Any, marker: str) -> bool:
+    marker_text = normalize(marker).lower()
+    if not marker_text:
+        return False
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if marker_text == normalize(key).lower():
+                return True
+            if contains_functional_marker(item, marker):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(contains_functional_marker(item, marker) for item in value)
+    return marker_text in normalize(value).lower()
+
+
+def body_contains_functional_evidence(body: str, functional_markers: tuple[str, ...]) -> bool:
+    if not body or not functional_markers:
+        return False
+    parsed = parse_json_body(body)
+    if parsed is not None:
+        return any(contains_functional_marker(parsed, marker) for marker in functional_markers)
+    lowered = body.lower()
+    return any(normalize(marker).lower() in lowered for marker in functional_markers if normalize(marker))
+
+
 def parse_json_body(body: str) -> Any | None:
     try:
         return json.loads(body)
@@ -217,7 +243,10 @@ def validate_bola_response(evidence: HttpExchangeEvidence, resource: ProofSecRes
     )
 
 
-def validate_authorization_response(evidence: HttpExchangeEvidence) -> AuthorizationValidation:
+def validate_authorization_response(
+    evidence: HttpExchangeEvidence,
+    functional_markers: tuple[str, ...] = (),
+) -> AuthorizationValidation:
     if evidence.status in FORBIDDEN_STATUSES:
         return AuthorizationValidation(
             state="FIXED",
@@ -248,9 +277,23 @@ def validate_authorization_response(evidence: HttpExchangeEvidence) -> Authoriza
             confidence=0.45,
             reason="The endpoint returned 2xx, but the response text has authorization-error semantics.",
         )
+    if body_contains_functional_evidence(body, functional_markers):
+        return AuthorizationValidation(
+            state="PROVEN",
+            exploitability="PROVEN",
+            confidence=1.0,
+            reason="Lower-privileged identity received a successful response with configured functional evidence.",
+        )
+    if functional_markers:
+        return AuthorizationValidation(
+            state="VALIDATED",
+            exploitability="VALIDATED",
+            confidence=0.72,
+            reason="The endpoint returned 2xx without authorization-error semantics, but configured functional evidence was not found.",
+        )
     return AuthorizationValidation(
-        state="PROVEN",
-        exploitability="PROVEN",
-        confidence=1.0,
-        reason="Lower-privileged identity received a successful response without authorization-error semantics.",
+        state="VALIDATED",
+        exploitability="VALIDATED",
+        confidence=0.68,
+        reason="The endpoint returned 2xx without authorization-error semantics, but no functional evidence marker is configured.",
     )

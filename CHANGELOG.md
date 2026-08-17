@@ -15,6 +15,8 @@
 - Separa `observed_by` de `owner_identity` en Resource Discovery para no confundir recursos visibles con recursos propios.
 - Endurece BFLA/privilege para que `HTTP 2xx` con semántica de error de autorización no sea `PROVEN`.
 - Separa cuerpo completo interno de `response_body_preview` redactado para evitar truncado en discovery sin filtrar respuestas completas en proofs.
+- Añade atributos de identidad para resolver ownership por `user_id`, `username`, `email` u otros identificadores de negocio.
+- Endurece BFLA/privilege con marcadores funcionales configurables: `HTTP 2xx` sin evidencia de ejecución queda como `VALIDATED`, no `PROVEN`.
 
 ## 0.2.0
 

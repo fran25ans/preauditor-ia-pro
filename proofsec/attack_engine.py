@@ -186,13 +186,16 @@ def build_authorization_proof(
     identity: ProofSecIdentity,
     evidence: HttpExchangeEvidence,
     classification: str,
+    functional_markers: tuple[str, ...] = (),
 ) -> SecurityProof:
-    validation = validate_authorization_response(evidence)
+    validation = validate_authorization_response(evidence, functional_markers)
     state = validation.state
     exploitability = validation.exploitability
     confidence = validation.confidence
     if state == "PROVEN":
         conclusion = "SECURITY INVARIANT VIOLATED. Lower-privileged identity accessed a restricted function."
+    elif state == "VALIDATED":
+        conclusion = "Lower-privileged identity received a successful response, but functional execution evidence is incomplete."
     elif state == "FIXED":
         conclusion = "Authorization check respected during this run. Restricted function was denied."
     else:
@@ -304,10 +307,33 @@ def run_authorization_tests(model_path: Path, config_path: Path, test_type: str)
             evidence = run_http_request(target, endpoint.method, url, auth_headers(identity))
             requests_executed += 1
             classification = "BFLA" if test_type == "bfla" else "PRIVILEGE_ESCALATION"
-            proofs.append(build_authorization_proof(endpoint, identity, evidence, classification))
+            markers = authorization_functional_markers(config, endpoint, classification)
+            proofs.append(build_authorization_proof(endpoint, identity, evidence, classification, markers))
             if target.rate_limit_seconds:
                 time.sleep(target.rate_limit_seconds)
     return proof_payload(proofs, target)
+
+
+def authorization_functional_markers(config: dict, endpoint: EndpointNode, classification: str) -> tuple[str, ...]:
+    validation = config.get("authorization_validation") or {}
+    marker_map = validation.get("functional_markers") or {}
+    if not isinstance(marker_map, dict):
+        return ()
+    keys = (
+        f"{endpoint.method} {endpoint.path}",
+        endpoint.path,
+        endpoint.resource,
+        classification,
+        classification.lower(),
+    )
+    markers: list[str] = []
+    for key in keys:
+        raw = marker_map.get(key)
+        if isinstance(raw, str):
+            markers.append(raw)
+        elif isinstance(raw, list):
+            markers.extend(str(item) for item in raw)
+    return tuple(dict.fromkeys(marker for marker in markers if marker))
 
 
 def run_dynamic_tests(model_path: Path, contract_path: Path, config_path: Path, test_type: str) -> dict:

@@ -236,6 +236,7 @@ class ProofSecIdentity:
     auth_type: str = "none"
     token_env: str = ""
     token_value: str = ""
+    attributes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

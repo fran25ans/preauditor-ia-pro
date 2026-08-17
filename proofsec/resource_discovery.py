@@ -60,6 +60,10 @@ def owner_from_item(item: Any, owner_fields: tuple[str, ...], identities: dict[s
         value_text = normalize(value)
         if value_text in identity_names:
             return value_text, f"response_field:{field}", 1.0
+        for identity in identities.values():
+            for attribute_name, attribute_value in identity.attributes.items():
+                if value_text and value_text == normalize(attribute_value):
+                    return identity.name, f"response_field:{field}->identity_attribute:{attribute_name}", 1.0
     return "UNKNOWN", "not_resolved", 0.0
 
 

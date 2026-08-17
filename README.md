@@ -354,6 +354,11 @@ ProofSec puede descubrir recursos con un endpoint de listado configurado. Si no 
   "identities": {
     "advisor_a": {
       "role": "ADVISOR",
+      "attributes": {
+        "user_id": "4001",
+        "username": "advisor_a",
+        "email": "advisor-a@example.test"
+      },
       "auth": {
         "type": "bearer",
         "token_env": "TOKEN_ADVISOR_A"
@@ -361,6 +366,11 @@ ProofSec puede descubrir recursos con un endpoint de listado configurado. Si no 
     },
     "advisor_b": {
       "role": "ADVISOR",
+      "attributes": {
+        "user_id": "98371",
+        "username": "advisor_b",
+        "email": "advisor-b@example.test"
+      },
       "auth": {
         "type": "bearer",
         "token_env": "TOKEN_ADVISOR_B"
@@ -374,6 +384,13 @@ ProofSec puede descubrir recursos con un endpoint de listado configurado. Si no 
       "id_field": "id",
       "owner_fields": ["owner", "advisor.id", "advisorId"],
       "owner_marker_fields": ["owner", "advisor.id", "advisorId"]
+    }
+  },
+  "authorization_validation": {
+    "functional_markers": {
+      "GET /api/admin/audit": ["entries", "admin-audit-visible"],
+      "GET /api/admin/users": ["users"],
+      "PRIVILEGE_ESCALATION": ["created", "updated", "deleted", "ok"]
     }
   },
   "resources": {
@@ -399,6 +416,7 @@ ProofSec distingue tres conceptos:
 
 - `observed_by`: la identidad que ha visto el recurso en un listado.
 - `owner_identity`: el owner resuelto desde campos como `owner`, `advisor.id` o `advisorId`.
+- `attributes`: valores de identidad como `user_id`, `email` o `username` que permiten resolver ownership cuando la API devuelve IDs internos en vez del nombre de la identidad.
 - `UNKNOWN`: recursos visibles pero sin ownership confirmado.
 
 Los recursos compartidos o con owner desconocido no se usan para declarar BOLA `PROVEN` hasta resolver ownership. El cuerpo completo se usa solo para análisis interno con límite de tamaño; los entregables guardan únicamente previews redactados.
@@ -423,6 +441,8 @@ proofsec test --type all --model deliverables/proofsec/security-model.json --con
 ```
 
 `bfla` prueba accesos de un rol bajo a funciones de otro rol usando endpoints de lectura. `privilege` cubre acciones mutantes como `POST`, `PUT`, `PATCH` o `DELETE`, pero queda bloqueado por defecto salvo que el runtime incluya `"allow_mutating": true`.
+
+Para BFLA/privilege, un `HTTP 2xx` sin error ya no se considera automáticamente `PROVEN`. Si no configuras `authorization_validation.functional_markers`, el resultado queda como `VALIDATED`: hay una señal preocupante, pero falta demostrar que la función restringida se ejecutó realmente. Para llegar a `PROVEN`, configura marcadores funcionales esperados por endpoint, recurso o tipo de prueba, por ejemplo `entries` para un endpoint de auditoría o `users` para un endpoint administrativo de usuarios.
 
 Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`. Para BOLA/IDOR, `PROVEN` es estricto: no basta con `HTTP 200`; la respuesta debe confirmar estructuralmente el ID del recurso solicitado y una señal de ownership dentro del mismo objeto de recurso. Un payload de error con texto como `customer 202 belongs to advisor_b` no cuenta como prueba.
 
@@ -457,6 +477,8 @@ Principios de ProofSec:
 - ningún finding se marca como `PROVEN` sin evidencia dinámica real
 - BOLA/IDOR solo es `PROVEN` si el validador confirma recurso y ownership; `200 + body no vacío` no es suficiente
 - discovery separa `observed_by` de `owner_identity`; visible para una identidad no equivale automáticamente a pertenecerle
+- ownership puede resolverse comparando campos de respuesta con atributos de identidad como `user_id`, `username` o `email`
+- BFLA/privilege solo llega a `PROVEN` si existe evidencia funcional configurada, no solo por devolver `HTTP 2xx`
 - el cuerpo completo de respuesta se usa para análisis interno, pero los proofs exportan solo previews redactados
 - las pruebas dinámicas requieren `target.authorized: true`
 - por defecto solo se permiten targets `localhost` o `127.0.0.1`

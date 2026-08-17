@@ -10,6 +10,11 @@
   "identities": {
     "advisor_a": {
       "role": "ADVISOR",
+      "attributes": {
+        "user_id": "4001",
+        "username": "advisor_a",
+        "email": "advisor-a@example.test"
+      },
       "auth": {
         "type": "bearer",
         "token_env": "TOKEN_ADVISOR_A"
@@ -17,6 +22,11 @@
     },
     "advisor_b": {
       "role": "ADVISOR",
+      "attributes": {
+        "user_id": "98371",
+        "username": "advisor_b",
+        "email": "advisor-b@example.test"
+      },
       "auth": {
         "type": "bearer",
         "token_env": "TOKEN_ADVISOR_B"
@@ -44,6 +54,13 @@
       "id_field": "id",
       "owner_fields": ["owner", "advisor.id", "advisorId"],
       "owner_marker_fields": ["owner", "advisor.id", "advisorId"]
+    }
+  },
+  "authorization_validation": {
+    "functional_markers": {
+      "GET /api/admin/audit": ["entries", "admin-audit-visible"],
+      "GET /api/admin/users": ["users"],
+      "PRIVILEGE_ESCALATION": ["created", "updated", "deleted", "ok"]
     }
   }
 }

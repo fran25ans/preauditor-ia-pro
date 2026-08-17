@@ -1208,6 +1208,94 @@ public class AdminController {
         self.assertEqual(tested_resources, {"customer_101", "customer_202"})
         self.assertIn("ownership marker", payload["proofs"][0]["conclusion"])
 
+    def test_proofsec_bola_discovery_resolves_owner_from_identity_attributes(self):
+        class AttributeOwnerHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                authorization = self.headers.get("Authorization", "")
+                if self.path == "/api/customers":
+                    items = (
+                        [{"id": "202", "advisorId": "98371", "email": "customer202@example.test"}]
+                        if authorization.endswith("advisor-b")
+                        else [{"id": "101", "advisorId": "4001", "email": "customer101@example.test"}]
+                    )
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(preauditor.json.dumps({"data": items}).encode())
+                    return
+                if self.path in {"/api/customers/101", "/api/customers/202"}:
+                    customer_id = self.path.rsplit("/", 1)[-1]
+                    advisor_id = "98371" if customer_id == "202" else "4001"
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(f'{{"id":"{customer_id}","advisorId":"{advisor_id}"}}'.encode())
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), AttributeOwnerHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                model = build_security_model(root)
+                contract = propose_security_contract(model)
+                invariant_id = contract.invariants[0].invariant_id
+                contract = update_invariant_status(contract, invariant_id, "confirmed")
+                model_path = root / "model.json"
+                contract_path = root / "contract.json"
+                config_path = root / "runtime-discovery-attributes.json"
+                model.write_json(model_path)
+                contract.write_json(contract_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {
+                                "base_url": f"http://127.0.0.1:{server.server_port}",
+                                "authorized": True,
+                                "max_requests": 10,
+                            },
+                            "identities": {
+                                "advisor_a": {
+                                    "role": "ADVISOR",
+                                    "attributes": {"user_id": "4001", "email": "advisor-a@example.test"},
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                                },
+                                "advisor_b": {
+                                    "role": "ADVISOR",
+                                    "attributes": {"user_id": "98371", "email": "advisor-b@example.test"},
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-b"},
+                                },
+                            },
+                            "discovery": {
+                                "customers": {
+                                    "list_endpoint": "/api/customers",
+                                    "items_path": "data",
+                                    "id_field": "id",
+                                    "owner_fields": ["advisorId"],
+                                    "owner_marker_fields": ["advisorId"],
+                                }
+                            },
+                        },
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 2)
+        owners = {proof["resource_owner"] for proof in payload["proofs"]}
+        self.assertEqual(owners, {"advisor_a", "advisor_b"})
+
     def test_proofsec_bola_discovery_skips_shared_resource_observed_by_attacker(self):
         class SharedHandler(BaseHTTPRequestHandler):
             def log_message(self, format, *args):
@@ -1387,6 +1475,11 @@ public class AdminController {
                                     "owner_identity": "advisor_a",
                                 }
                             },
+                            "authorization_validation": {
+                                "functional_markers": {
+                                    "GET /api/admin/audit": ["entries", "admin-audit-visible"]
+                                }
+                            },
                         }
                     ),
                     encoding="utf-8",
@@ -1403,6 +1496,40 @@ public class AdminController {
         self.assertEqual(proof["vulnerability"], "Broken Function Level Authorization")
         self.assertEqual(proof["actual"], "200")
         self.assertIn("Lower-privileged identity", proof["conclusion"])
+
+    def test_proofsec_bfla_2xx_without_functional_marker_is_validated_not_proven(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                self.add_admin_controller(root)
+                model = build_security_model(root)
+                model_path = root / "model.json"
+                config_path = root / "runtime.json"
+                model.write_json(model_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {"base_url": f"http://127.0.0.1:{server.server_port}", "authorized": True},
+                            "identities": {
+                                "advisor_a": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                                }
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_authorization_tests(model_path, config_path, "bfla")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 0)
+        self.assertEqual(payload["kpis"]["validated_findings"], 1)
+        self.assertEqual(payload["proofs"][0]["finding_state"], "VALIDATED")
 
     def test_proofsec_bfla_2xx_authorization_error_payload_is_not_proven(self):
         class ErrorAdminHandler(BaseHTTPRequestHandler):
