@@ -17,6 +17,8 @@
 - Separa cuerpo completo interno de `response_body_preview` redactado para evitar truncado en discovery sin filtrar respuestas completas en proofs.
 - Añade atributos de identidad para resolver ownership por `user_id`, `username`, `email` u otros identificadores de negocio.
 - Endurece BFLA/privilege con marcadores funcionales configurables: `HTTP 2xx` sin evidencia de ejecución queda como `VALIDATED`, no `PROVEN`.
+- Añade sugerencias automáticas de campos de ownership al correlacionar respuestas de discovery con atributos de identidad.
+- Separa el cliente HTTP dinámico en `proofsec/http/client.py` para reducir acoplamiento entre discovery y attack engine.
 
 ## 0.2.0
 

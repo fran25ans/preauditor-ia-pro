@@ -421,6 +421,8 @@ ProofSec distingue tres conceptos:
 
 Los recursos compartidos o con owner desconocido no se usan para declarar BOLA `PROVEN` hasta resolver ownership. El cuerpo completo se usa solo para análisis interno con límite de tamaño; los entregables guardan únicamente previews redactados.
 
+Si no defines `owner_fields`, ProofSec intenta sugerirlos correlacionando campos de respuesta con `identity.attributes`. Por ejemplo, si una respuesta contiene `advisorId: 98371` y la identidad `advisor_b` declara `"user_id": "98371"`, el payload incluye una sugerencia en `resource_discovery.suggested_owner_fields` y puede usar ese campo para resolver ownership con confianza alta.
+
 Ejecuta el test BOLA:
 
 ```bash
@@ -478,6 +480,7 @@ Principios de ProofSec:
 - BOLA/IDOR solo es `PROVEN` si el validador confirma recurso y ownership; `200 + body no vacío` no es suficiente
 - discovery separa `observed_by` de `owner_identity`; visible para una identidad no equivale automáticamente a pertenecerle
 - ownership puede resolverse comparando campos de respuesta con atributos de identidad como `user_id`, `username` o `email`
+- discovery puede sugerir campos de ownership correlacionando respuestas reales con atributos de identidad
 - BFLA/privilege solo llega a `PROVEN` si existe evidencia funcional configurada, no solo por devolver `HTTP 2xx`
 - el cuerpo completo de respuesta se usa para análisis interno, pero los proofs exportan solo previews redactados
 - las pruebas dinámicas requieren `target.authorized: true`

@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from proofsec.attack_engine import run_http_request
+from proofsec.http.client import run_http_request
 from proofsec.models import ProofSecIdentity, ProofSecResourceExample, ProofSecTarget
+from proofsec.ownership_suggestions import OwnershipFieldSuggestion, suggest_owner_fields_for_item
 from proofsec.runtime_config import auth_headers
 
 
@@ -67,18 +68,19 @@ def owner_from_item(item: Any, owner_fields: tuple[str, ...], identities: dict[s
     return "UNKNOWN", "not_resolved", 0.0
 
 
-def discover_resources(
+def discover_resources_with_suggestions(
     config: dict,
     target: ProofSecTarget,
     identities: dict[str, ProofSecIdentity],
-) -> list[ProofSecResourceExample]:
+) -> tuple[list[ProofSecResourceExample], list[OwnershipFieldSuggestion]]:
     discovered: list[ProofSecResourceExample] = []
+    suggestions: list[OwnershipFieldSuggestion] = []
     for resource_name, raw in (config.get("discovery") or {}).items():
         list_endpoint = str(raw.get("list_endpoint") or "").strip()
         id_field = str(raw.get("id_field") or "id")
         items_path = str(raw.get("items_path") or "")
         marker_fields = tuple(str(item) for item in raw.get("owner_marker_fields", ["owner", "owner.id", "advisor", "advisor.id", "advisorId"]))
-        owner_fields = tuple(str(item) for item in raw.get("owner_fields", marker_fields))
+        configured_owner_fields = tuple(str(item) for item in raw.get("owner_fields", []))
         if not list_endpoint.startswith("/"):
             continue
         for identity in identities.values():
@@ -97,6 +99,10 @@ def discover_resources(
                 if resource_id is None:
                     continue
                 resource_id_text = normalize(resource_id)
+                item_suggestions = suggest_owner_fields_for_item(resource_name, item, identity, identities)
+                suggestions.extend(item_suggestions)
+                suggested_fields = tuple(suggestion.field for suggestion in item_suggestions if suggestion.confidence >= 0.9)
+                owner_fields = configured_owner_fields or tuple(dict.fromkeys([*suggested_fields, *marker_fields]))
                 owner_identity, ownership_source, ownership_confidence = owner_from_item(item, owner_fields, identities)
                 discovered.append(
                     ProofSecResourceExample(
@@ -129,4 +135,27 @@ def discover_resources(
             )
         else:
             merged[key] = item
-    return sorted(merged.values(), key=lambda item: (item.resource, item.resource_id, item.owner_identity))
+    deduped_suggestions: dict[tuple[str, str, str, str], OwnershipFieldSuggestion] = {}
+    for suggestion in suggestions:
+        key = (
+            suggestion.resource,
+            suggestion.field,
+            suggestion.identity_attribute,
+            suggestion.matched_identity,
+        )
+        existing = deduped_suggestions.get(key)
+        if existing is None or suggestion.confidence > existing.confidence:
+            deduped_suggestions[key] = suggestion
+    return (
+        sorted(merged.values(), key=lambda item: (item.resource, item.resource_id, item.owner_identity)),
+        sorted(deduped_suggestions.values(), key=lambda item: (item.resource, -item.confidence, item.field)),
+    )
+
+
+def discover_resources(
+    config: dict,
+    target: ProofSecTarget,
+    identities: dict[str, ProofSecIdentity],
+) -> list[ProofSecResourceExample]:
+    resources, _ = discover_resources_with_suggestions(config, target, identities)
+    return resources

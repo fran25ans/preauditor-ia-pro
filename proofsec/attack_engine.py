@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import time
-from urllib import error as urlerror
-from urllib import request as urlrequest
 
 from proofsec.contract import load_security_model
+from proofsec.http.client import run_http_request
 from proofsec.invariants import load_security_contract
 from proofsec.models import (
     ContractInvariant,
@@ -30,13 +29,11 @@ from proofsec.runtime_config import (
     load_resource_examples,
     load_runtime_config,
     load_target,
-    redacted_headers,
 )
 
 
 READ_METHODS = {"GET", "HEAD"}
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-MAX_ANALYSIS_BODY_BYTES = 1024 * 1024
 
 
 def endpoint_url(target: ProofSecTarget, endpoint: EndpointNode, resource_id: str) -> str:
@@ -44,71 +41,6 @@ def endpoint_url(target: ProofSecTarget, endpoint: EndpointNode, resource_id: st
     for parameter in endpoint.parameters:
         path = path.replace("{" + parameter + "}", resource_id)
     return target.base_url.rstrip("/") + "/" + path.lstrip("/")
-
-
-def run_http_request(
-    target: ProofSecTarget,
-    method: str,
-    url: str,
-    headers: dict[str, str],
-) -> HttpExchangeEvidence:
-    safe_headers = dict(headers)
-    if target.dry_run:
-        return HttpExchangeEvidence(
-            method=method,
-            url=url,
-            request_headers=redacted_headers(safe_headers),
-            status=None,
-            response_headers={},
-            response_body_preview="DRY RUN: request was not executed.",
-            response_body="",
-        )
-    request = urlrequest.Request(url, headers=safe_headers, method=method)
-    try:
-        with urlrequest.urlopen(request, timeout=target.timeout_seconds) as response:
-            body = response.read(MAX_ANALYSIS_BODY_BYTES).decode("utf-8", errors="replace")
-            return HttpExchangeEvidence(
-                method=method,
-                url=url,
-                request_headers=redacted_headers(safe_headers),
-                status=int(response.status),
-                response_headers=redacted_headers(dict(response.headers.items())),
-                response_body_preview=redact_body(body),
-                response_body=body,
-            )
-    except urlerror.HTTPError as exc:
-        try:
-            body = exc.read(MAX_ANALYSIS_BODY_BYTES).decode("utf-8", errors="replace")
-            return HttpExchangeEvidence(
-                method=method,
-                url=url,
-                request_headers=redacted_headers(safe_headers),
-                status=int(exc.code),
-                response_headers=redacted_headers(dict(exc.headers.items())),
-                response_body_preview=redact_body(body),
-                response_body=body,
-            )
-        finally:
-            exc.close()
-    except Exception as exc:
-        return HttpExchangeEvidence(
-            method=method,
-            url=url,
-            request_headers=redacted_headers(safe_headers),
-            status=None,
-            response_headers={},
-            response_body_preview="",
-            response_body="",
-            error=str(exc),
-        )
-
-
-def redact_body(body: str) -> str:
-    trimmed = body[:2000]
-    for marker in ("token", "password", "secret", "api_key", "authorization"):
-        trimmed = trimmed.replace(marker, f"{marker[:2]}****")
-        trimmed = trimmed.replace(marker.upper(), f"{marker[:2].upper()}****")
-    return trimmed
 
 
 def matching_confirmed_bola_invariants(contract_path: Path) -> list[ContractInvariant]:
@@ -239,15 +171,18 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
     assert_target_authorized(target)
     identities = load_identities(config)
     resources = load_resource_examples(config, require=False)
+    discovery_suggestions: list[dict[str, object]] = []
     if config.get("discovery"):
-        from proofsec.resource_discovery import discover_resources
+        from proofsec.resource_discovery import discover_resources_with_suggestions
 
+        discovered_resources, suggestions = discover_resources_with_suggestions(config, target, identities)
+        discovery_suggestions = [suggestion.to_dict() for suggestion in suggestions]
         resources = sorted(
             {(
                 resource.resource,
                 resource.resource_id,
                 resource.owner_identity,
-            ): resource for resource in [*resources, *discover_resources(config, target, identities)]}.values(),
+            ): resource for resource in [*resources, *discovered_resources]}.values(),
             key=lambda item: (item.resource, item.resource_id, item.owner_identity),
         )
     if not resources:
@@ -268,14 +203,14 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
                     if identity.role not in endpoint.roles:
                         continue
                     if requests_executed >= target.max_requests:
-                        return proof_payload(proofs, target, limited=True)
+                        return proof_payload(proofs, target, limited=True, resource_discovery_suggestions=discovery_suggestions)
                     url = endpoint_url(target, endpoint, resource.resource_id)
                     evidence = run_http_request(target, endpoint.method, url, auth_headers(identity))
                     requests_executed += 1
                     proofs.append(build_bola_proof(invariant, endpoint, identity, resource, evidence))
                     if target.rate_limit_seconds:
                         time.sleep(target.rate_limit_seconds)
-    return proof_payload(proofs, target)
+    return proof_payload(proofs, target, resource_discovery_suggestions=discovery_suggestions)
 
 
 def run_authorization_tests(model_path: Path, config_path: Path, test_type: str) -> dict:
@@ -352,12 +287,22 @@ def run_dynamic_tests(model_path: Path, contract_path: Path, config_path: Path, 
     raise ValueError(f"Unsupported dynamic test type: {test_type}")
 
 
-def proof_payload(proofs: list[SecurityProof], target: ProofSecTarget, limited: bool = False) -> dict:
-    return proof_payload_dicts([proof.to_dict() for proof in proofs], target, limited)
+def proof_payload(
+    proofs: list[SecurityProof],
+    target: ProofSecTarget,
+    limited: bool = False,
+    resource_discovery_suggestions: list[dict[str, object]] | None = None,
+) -> dict:
+    return proof_payload_dicts([proof.to_dict() for proof in proofs], target, limited, resource_discovery_suggestions)
 
 
-def proof_payload_dicts(proofs: list[dict], target: ProofSecTarget, limited: bool = False) -> dict:
-    return {
+def proof_payload_dicts(
+    proofs: list[dict],
+    target: ProofSecTarget,
+    limited: bool = False,
+    resource_discovery_suggestions: list[dict[str, object]] | None = None,
+) -> dict:
+    payload = {
         "schema_version": "1.0",
         "target": {
             "base_url": target.base_url,
@@ -378,6 +323,11 @@ def proof_payload_dicts(proofs: list[dict], target: ProofSecTarget, limited: boo
         },
         "proofs": proofs,
     }
+    if resource_discovery_suggestions:
+        payload["resource_discovery"] = {
+            "suggested_owner_fields": resource_discovery_suggestions,
+        }
+    return payload
 
 
 def write_proofs(payload: dict, output: Path) -> None:

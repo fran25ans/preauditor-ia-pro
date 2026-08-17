@@ -1278,7 +1278,6 @@ public class AdminController {
                                     "list_endpoint": "/api/customers",
                                     "items_path": "data",
                                     "id_field": "id",
-                                    "owner_fields": ["advisorId"],
                                     "owner_marker_fields": ["advisorId"],
                                 }
                             },
@@ -1295,6 +1294,8 @@ public class AdminController {
         self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 2)
         owners = {proof["resource_owner"] for proof in payload["proofs"]}
         self.assertEqual(owners, {"advisor_a", "advisor_b"})
+        suggested = payload["resource_discovery"]["suggested_owner_fields"]
+        self.assertTrue(any(item["field"] == "advisorId" and item["identity_attribute"] == "user_id" for item in suggested))
 
     def test_proofsec_bola_discovery_skips_shared_resource_observed_by_attacker(self):
         class SharedHandler(BaseHTTPRequestHandler):
