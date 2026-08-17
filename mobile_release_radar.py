@@ -116,6 +116,18 @@ NOISY_DOMAIN_PREFIXES = (
     "schemas.android.",
 )
 NOISY_HOSTS = {"www.w3.org", "schemas.android.com"}
+DEFAULT_POLICY = {
+    "block_on_critical": True,
+    "block_on_new_high": True,
+    "block_on_debuggable": True,
+    "block_on_cleartext": False,
+    "block_on_new_dangerous_permissions": False,
+    "block_on_new_exported_components": False,
+    "max_new_dangerous_permissions": 3,
+    "max_new_exported_components": 5,
+    "max_high_findings": 10,
+    "require_previous": False,
+}
 
 
 @dataclass
@@ -562,7 +574,172 @@ def severity_counts(findings: list[Finding]) -> dict[str, int]:
     return {severity: sum(1 for finding in findings if finding.severity == severity) for severity in ("Critical", "High", "Medium", "Low")}
 
 
-def release_score(profile: MobileProfile, comparison: dict) -> tuple[int, str, list[str]]:
+def finding_rule_ids(profile: MobileProfile) -> set[str]:
+    return {finding.rule_id for finding in profile.findings}
+
+
+def load_policy(path: Path | None) -> dict:
+    policy = dict(DEFAULT_POLICY)
+    if not path:
+        return policy
+    if not path.exists():
+        raise ValueError(f"Policy file not found: {path}")
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix.lower() == ".json":
+        loaded = json.loads(text)
+    else:
+        loaded = {}
+        for raw_line in text.splitlines():
+            line = raw_line.split("#", 1)[0].strip()
+            if not line or ":" not in line:
+                continue
+            key, value = [part.strip() for part in line.split(":", 1)]
+            lowered = value.lower()
+            if lowered in {"true", "yes", "on"}:
+                loaded[key] = True
+            elif lowered in {"false", "no", "off"}:
+                loaded[key] = False
+            else:
+                try:
+                    loaded[key] = int(value)
+                except ValueError:
+                    loaded[key] = value.strip("\"'")
+    if not isinstance(loaded, dict):
+        raise ValueError("Policy file must contain an object or simple key/value YAML.")
+    for key, value in loaded.items():
+        if key in policy:
+            policy[key] = value
+    return policy
+
+
+def store_readiness_checklist(profile: MobileProfile, comparison: dict, policy: dict) -> list[dict]:
+    rules = finding_rule_ids(profile)
+    has_previous = bool(comparison.get("available"))
+    items = [
+        {
+            "id": "REL-001",
+            "title": "Previous build provided",
+            "status": "pass" if has_previous or not policy.get("require_previous") else "fail",
+            "detail": "Baseline comparison available." if has_previous else "No previous build was provided; this scan can seed the first baseline.",
+        },
+        {
+            "id": "REL-002",
+            "title": "No critical findings",
+            "status": "pass" if not any(f.severity == "Critical" for f in profile.findings) else "fail",
+            "detail": "Critical findings require release owner review before publication.",
+        },
+        {
+            "id": "REL-003",
+            "title": "New high-risk findings within policy",
+            "status": "pass" if not has_previous or comparison.get("new_findings", 0) == 0 or not policy.get("block_on_new_high") else "fail",
+            "detail": f"New findings vs previous: {comparison.get('new_findings', 0)}.",
+        },
+        {
+            "id": "REL-004",
+            "title": "Dangerous permissions within policy",
+            "status": "pass"
+            if not has_previous
+            or len(comparison.get("added_dangerous_permissions", [])) <= int(policy.get("max_new_dangerous_permissions", 3))
+            else "fail",
+            "detail": (
+                f"New dangerous permissions: {len(comparison.get('added_dangerous_permissions', []))}."
+                if has_previous
+                else f"Current dangerous permissions: {len(profile.dangerous_permissions)}."
+            ),
+        },
+        {
+            "id": "REL-005",
+            "title": "Exported components within policy",
+            "status": "pass"
+            if not has_previous
+            or len(comparison.get("added_exported_components", [])) <= int(policy.get("max_new_exported_components", 5))
+            else "fail",
+            "detail": (
+                f"New exported components: {len(comparison.get('added_exported_components', []))}."
+                if has_previous
+                else f"Current exported components: {len(profile.exported_components)}."
+            ),
+        },
+        {
+            "id": "REL-006",
+            "title": "No embedded secret indicators",
+            "status": "pass" if "MOB-001" not in rules else "fail",
+            "detail": "Secrets must not be packaged in mobile artifacts.",
+        },
+    ]
+    if profile.platform == "android":
+        items.extend(
+            [
+                {
+                    "id": "AND-READY-001",
+                    "title": "Release is not debuggable",
+                    "status": "pass" if "AND-001" not in rules else "fail",
+                    "detail": "android:debuggable must be disabled for release builds.",
+                },
+                {
+                    "id": "AND-READY-002",
+                    "title": "Cleartext traffic not explicitly allowed",
+                    "status": "pass" if "AND-003" not in rules else "fail",
+                    "detail": "HTTPS should be enforced unless an exception is explicitly justified.",
+                },
+                {
+                    "id": "AND-READY-003",
+                    "title": "Target SDK detected",
+                    "status": "pass" if profile.target_sdk else "review",
+                    "detail": f"targetSdkVersion: {profile.target_sdk or 'not detected'}.",
+                },
+            ]
+        )
+    if profile.platform == "ios":
+        items.extend(
+            [
+                {
+                    "id": "IOS-READY-001",
+                    "title": "ATS is not globally disabled",
+                    "status": "pass" if "IOS-001" not in rules else "fail",
+                    "detail": "Avoid NSAllowsArbitraryLoads=true in production.",
+                },
+                {
+                    "id": "IOS-READY-002",
+                    "title": "Sensitive permission descriptions detected",
+                    "status": "pass" if profile.permissions else "review",
+                    "detail": f"Sensitive usage keys: {len(profile.permissions)}.",
+                },
+            ]
+        )
+    return items
+
+
+def evaluate_policy(profile: MobileProfile, comparison: dict, policy: dict) -> list[str]:
+    counts = severity_counts(profile.findings)
+    rules = finding_rule_ids(profile)
+    has_previous = bool(comparison.get("available"))
+    violations: list[str] = []
+    if policy.get("require_previous") and not comparison.get("available"):
+        violations.append("Policy requires a previous build for release comparison.")
+    if policy.get("block_on_critical") and counts["Critical"]:
+        violations.append(f"Policy blocks releases with critical findings ({counts['Critical']}).")
+    if policy.get("block_on_new_high") and comparison.get("available") and comparison.get("new_findings", 0):
+        violations.append(f"Policy blocks releases with new findings ({comparison['new_findings']}).")
+    if policy.get("block_on_debuggable") and "AND-001" in rules:
+        violations.append("Policy blocks debuggable Android builds.")
+    if policy.get("block_on_cleartext") and ("AND-003" in rules or "MOB-002" in rules):
+        violations.append("Policy blocks cleartext traffic indicators.")
+    if has_previous and policy.get("block_on_new_dangerous_permissions") and comparison.get("added_dangerous_permissions"):
+        violations.append("Policy blocks new dangerous permissions.")
+    if has_previous and policy.get("block_on_new_exported_components") and comparison.get("added_exported_components"):
+        violations.append("Policy blocks new exported components.")
+    if has_previous and len(comparison.get("added_dangerous_permissions", [])) > int(policy.get("max_new_dangerous_permissions", 3)):
+        violations.append("Policy limit exceeded for new dangerous permissions.")
+    if has_previous and len(comparison.get("added_exported_components", [])) > int(policy.get("max_new_exported_components", 5)):
+        violations.append("Policy limit exceeded for new exported components.")
+    if counts["High"] > int(policy.get("max_high_findings", 10)):
+        violations.append("Policy limit exceeded for high findings.")
+    return violations
+
+
+def release_score(profile: MobileProfile, comparison: dict, policy: dict | None = None) -> tuple[int, str, list[str], list[str]]:
+    policy = policy or dict(DEFAULT_POLICY)
     score = 100
     reasons: list[str] = []
     counts = severity_counts(profile.findings)
@@ -584,13 +761,16 @@ def release_score(profile: MobileProfile, comparison: dict) -> tuple[int, str, l
         score -= min(25, comparison["new_findings"] * 8)
         reasons.append(f"{comparison['new_findings']} new risk finding(s)")
     score = max(0, score)
-    if counts["Critical"] or (comparison.get("available") and comparison.get("new_findings", 0) >= 3):
+    policy_violations = evaluate_policy(profile, comparison, policy)
+    if policy_violations:
+        reasons.extend(policy_violations)
+    if policy_violations or counts["Critical"] or (comparison.get("available") and comparison.get("new_findings", 0) >= 3):
         decision = "blocked"
     elif counts["High"] or added_dangerous or added_components or comparison.get("new_findings", 0):
         decision = "needs_review"
     else:
         decision = "approved"
-    return score, decision, reasons or ["No blocking risk indicators detected."]
+    return score, decision, reasons or ["No blocking risk indicators detected."], policy_violations
 
 
 def public_profile(profile: MobileProfile) -> dict:
@@ -599,10 +779,75 @@ def public_profile(profile: MobileProfile) -> dict:
     return payload
 
 
-def result_payload(current: MobileProfile, previous: MobileProfile | None) -> dict:
+def app_identifier(profile: MobileProfile) -> str:
+    return profile.package_name or profile.bundle_id or profile.display_name or Path(profile.artifact).stem
+
+
+def history_path(root: Path, profile: MobileProfile) -> Path:
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", app_identifier(profile)).strip("_") or "unknown-app"
+    return root / safe_name / "history.jsonl"
+
+
+def load_history(root: Path | None, profile: MobileProfile, limit: int = 8) -> list[dict]:
+    if not root:
+        return []
+    path = history_path(root, profile)
+    if not path.exists():
+        return []
+    entries = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return entries[-limit:]
+
+
+def append_history(root: Path | None, payload: dict) -> Path | None:
+    if not root:
+        return None
+    current = payload["current"]
+    profile = MobileProfile(
+        artifact=current["artifact"],
+        platform=current["platform"],
+        sha256=current["sha256"],
+        size_bytes=current["size_bytes"],
+        generated_at=current["generated_at"],
+        package_name=current.get("package_name", ""),
+        bundle_id=current.get("bundle_id", ""),
+        display_name=current.get("display_name", ""),
+    )
+    path = history_path(root, profile)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "generated_at": payload["generated_at"],
+        "artifact": current["artifact"],
+        "sha256": current["sha256"],
+        "platform": current["platform"],
+        "app": app_identifier(profile),
+        "version_name": current.get("version_name", ""),
+        "version_code": current.get("version_code", ""),
+        "build_number": current.get("build_number", ""),
+        "decision": payload["decision"],
+        "release_score": payload["release_score"],
+        "findings": len(current.get("findings", [])),
+        "new_findings": payload["comparison"].get("new_findings", 0),
+        "fixed_findings": payload["comparison"].get("fixed_findings", 0),
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return path
+
+
+def result_payload(current: MobileProfile, previous: MobileProfile | None, policy: dict | None = None, history_root: Path | None = None) -> dict:
+    policy = policy or dict(DEFAULT_POLICY)
     comparison = compare_profiles(previous, current)
-    score, decision, reasons = release_score(current, comparison)
-    return {
+    score, decision, reasons, policy_violations = release_score(current, comparison, policy)
+    checklist = store_readiness_checklist(current, comparison, policy)
+    history_before = load_history(history_root, current)
+    payload = {
         "schema_version": "1.0",
         "tool": TOOL_NAME,
         "tool_version": TOOL_VERSION,
@@ -610,10 +855,20 @@ def result_payload(current: MobileProfile, previous: MobileProfile | None) -> di
         "release_score": score,
         "decision": decision,
         "decision_reasons": reasons,
+        "policy": policy,
+        "policy_violations": policy_violations,
+        "store_readiness": checklist,
         "current": public_profile(current),
         "previous": public_profile(previous) if previous else None,
         "comparison": comparison,
+        "history": history_before,
+        "history_path": "",
     }
+    history_file = append_history(history_root, payload)
+    if history_file:
+        payload["history_path"] = str(history_file)
+        payload["history"] = load_history(history_root, current)
+    return payload
 
 
 def render_markdown(payload: dict) -> str:
@@ -642,16 +897,54 @@ def render_markdown(payload: dict) -> str:
         f"- Fixed findings vs previous: {comparison['fixed_findings']}",
         f"- Persistent findings vs previous: {comparison['persistent_findings']}",
         "",
-        "## Release Delta",
-        "",
-        f"- Added permissions: {len(comparison.get('added_permissions', []))}",
-        f"- Added dangerous permissions: {len(comparison.get('added_dangerous_permissions', []))}",
-        f"- Added exported components: {len(comparison.get('added_exported_components', []))}",
-        f"- Added domains: {len(comparison.get('added_domains', []))}",
-        f"- Added URL schemes: {len(comparison.get('added_url_schemes', []))}",
-        f"- Added libraries: {len(comparison.get('added_libraries', []))}",
+        "## Store Readiness Checklist",
         "",
     ]
+    for item in payload.get("store_readiness", []):
+        marker = {"pass": "[x]", "fail": "[!]", "review": "[?]"}.get(item["status"], "[?]")
+        lines.append(f"- {marker} **{item['title']}** - {item['detail']}")
+    lines.extend(
+        [
+            "",
+            "## Release Policy",
+            "",
+        ]
+    )
+    if payload.get("policy_violations"):
+        lines.extend(f"- BLOCKED: {violation}" for violation in payload["policy_violations"])
+    else:
+        lines.append("- No policy violations detected.")
+    lines.extend(
+        [
+            "",
+            "## History",
+            "",
+        ]
+    )
+    if payload.get("history"):
+        for entry in payload["history"][-8:]:
+            label = entry.get("version_name") or entry.get("version_code") or entry.get("build_number") or Path(entry.get("artifact", "")).name
+            lines.append(f"- {entry.get('generated_at', '')}: {label} - {entry.get('decision', '').upper()} ({entry.get('release_score', 0)}/100), findings={entry.get('findings', 0)}")
+    else:
+        lines.append("- No history stored for this app yet.")
+    lines.extend(
+        [
+            "",
+            "## Release Delta",
+            "",
+        ]
+    )
+    lines.extend(
+        [
+            f"- Added permissions: {len(comparison.get('added_permissions', []))}",
+            f"- Added dangerous permissions: {len(comparison.get('added_dangerous_permissions', []))}",
+            f"- Added exported components: {len(comparison.get('added_exported_components', []))}",
+            f"- Added domains: {len(comparison.get('added_domains', []))}",
+            f"- Added URL schemes: {len(comparison.get('added_url_schemes', []))}",
+            f"- Added libraries: {len(comparison.get('added_libraries', []))}",
+            "",
+        ]
+    )
     for label, key in (
         ("New dangerous permissions", "added_dangerous_permissions"),
         ("New exported components", "added_exported_components"),
@@ -764,6 +1057,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", help="Markdown report output path.")
     parser.add_argument("--html", help="HTML report output path.")
     parser.add_argument("--json", help="JSON output path.")
+    parser.add_argument("--policy", help="Optional release policy JSON/YAML file.")
+    parser.add_argument("--history-dir", help="Optional directory to store per-app release history.")
     parser.add_argument("--fail-on", choices=["blocked", "needs_review", "never"], default="never")
     return parser.parse_args()
 
@@ -782,7 +1077,13 @@ def main() -> int:
     args = parse_args()
     current = analyze_artifact(Path(args.artifact).expanduser().resolve(), args.platform)
     previous = analyze_artifact(Path(args.previous).expanduser().resolve(), args.platform) if args.previous else None
-    payload = result_payload(current, previous)
+    policy = load_policy(Path(args.policy).expanduser().resolve() if args.policy else None)
+    payload = result_payload(
+        current,
+        previous,
+        policy=policy,
+        history_root=Path(args.history_dir).expanduser().resolve() if args.history_dir else None,
+    )
     write_outputs(
         payload,
         Path(args.out).expanduser().resolve() if args.out else None,
@@ -795,6 +1096,10 @@ def main() -> int:
     print(f"New findings: {payload['comparison']['new_findings']}")
     print(f"Fixed findings: {payload['comparison']['fixed_findings']}")
     print(f"Persistent findings: {payload['comparison']['persistent_findings']}")
+    if payload.get("policy_violations"):
+        print(f"Policy violations: {len(payload['policy_violations'])}")
+    if payload.get("history_path"):
+        print(f"History: {payload['history_path']}")
     if args.out:
         print(f"Report: {Path(args.out).expanduser().resolve()}")
     if args.html:

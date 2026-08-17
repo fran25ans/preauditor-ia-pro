@@ -1,6 +1,6 @@
 # Pre-Auditor IA Pro
 
-Herramienta local para hacer un análisis preliminar de riesgos en proyectos con APIs, automatizaciones, infraestructura e integraciones de IA. No pretende ser el auditor final: detecta patrones, prioriza hallazgos y genera entregables para revisión experta del equipo.
+Herramienta local para hacer análisis preliminar de riesgos, revisar builds móviles y construir modelos de seguridad orientados a demostrar explotabilidad en entornos autorizados. No pretende ser el auditor final: detecta patrones, prioriza hallazgos, propone invariantes revisables y genera entregables para validación experta del equipo.
 
 > Esta auditoría automática no sustituye una revisión experta. Los hallazgos deben ser validados por una persona especializada, ya que pueden existir falsos positivos, falsos negativos y riesgos contextuales no detectables automáticamente.
 
@@ -12,6 +12,7 @@ Pre-Auditor IA Pro instala dos comandos locales:
 - `preauditor-ui`
 - `mobile-release-radar`
 - `mobile-release-ui`
+- `proofsec`
 
 ### Instalación rápida recomendada
 
@@ -166,6 +167,9 @@ Detecta señales como:
 - secretos o tokens empaquetados
 - patrones inseguros de TLS y WebView
 - hallazgos nuevos, corregidos y persistentes entre dos builds
+- checklist de preparación para tienda
+- política de release configurable en JSON/YAML
+- historial local por aplicación para ver tendencia entre builds
 
 ### Analizar una build móvil
 
@@ -195,16 +199,44 @@ mobile-release-radar ./app-86.apk \
   --json release-diff.json
 ```
 
+### Aplicar una política de release
+
+Puedes definir criterios internos para bloquear o revisar una release:
+
+```yaml
+block_on_critical: true
+block_on_new_high: true
+block_on_debuggable: true
+block_on_cleartext: false
+block_on_new_dangerous_permissions: false
+max_new_dangerous_permissions: 3
+max_new_exported_components: 5
+max_high_findings: 10
+require_previous: false
+```
+
+Y ejecutarlo así:
+
+```bash
+mobile-release-radar ./app-86.apk \
+  --previous ./app-85.apk \
+  --policy examples/mobile-release-policy.yml \
+  --history-dir deliverables/mobile-history \
+  --out release-diff.md \
+  --html release-diff.html \
+  --json release-diff.json
+```
+
 La salida indica:
 
 - `APPROVED`: no hay indicadores bloqueantes relevantes.
 - `NEEDS_REVIEW`: hay cambios o riesgos que requieren revisión antes de publicar.
-- `BLOCKED`: hay hallazgos críticos o demasiados riesgos nuevos.
+- `BLOCKED`: hay hallazgos críticos, incumplimientos de policy o demasiados riesgos nuevos.
 
 Ejemplo de uso en CI:
 
 ```bash
-mobile-release-radar ./app-release.apk --previous ./previous.apk --fail-on needs_review
+mobile-release-radar ./app-release.apk --previous ./previous.apk --policy examples/mobile-release-policy.yml --fail-on needs_review
 ```
 
 `mobile-release-radar` es una comprobación preliminar de release. No sustituye una revisión móvil experta ni herramientas especializadas como MobSF; puede complementarlas y centrarse en el diferencial diario de la build.
@@ -228,10 +260,73 @@ Desde esa pantalla puedes:
 - seleccionar APK/AAB/IPA actual
 - seleccionar APK/AAB/IPA anterior opcional
 - elegir plataforma Android/iOS o autodetección
+- seleccionar una política de release JSON/YAML
+- activar historial local por app
 - generar informe HTML, Markdown y JSON
-- ver score, decisión de release, hallazgos prioritarios y comparativa antes/después
+- ver score, decisión de release, checklist de tienda, incumplimientos de policy, hallazgos prioritarios, comparativa antes/después e histórico de builds
 
 La UI móvil es local y escucha solo en `127.0.0.1`.
+
+## ProofSec experimental
+
+ProofSec es la evolución orientada a demostrar explotabilidad real en entornos autorizados. El objetivo es pasar de hallazgos potenciales a pruebas reproducibles basadas en invariantes de seguridad.
+
+La primera fase disponible construye un modelo de seguridad local de aplicaciones Spring Boot REST:
+
+```bash
+proofsec analyze ./demo-app \
+  --stack spring-boot \
+  --out deliverables/proofsec/security-model.json \
+  --sqlite deliverables/proofsec/proofsec.sqlite
+```
+
+Esta fase detecta endpoints, roles, recursos y relaciones básicas `Role -> Endpoint -> Resource`. No ejecuta ataques dinámicos todavía.
+
+También puede generar un **Security Contract** inicial para revisión humana:
+
+```bash
+proofsec contract ./demo-app \
+  --stack spring-boot \
+  --out deliverables/proofsec/security-contract.yml
+```
+
+El contrato incluye permisos detectados e invariantes inferidas, por ejemplo reglas candidatas de autorización por ownership. Las invariantes nacen como `status: proposed` y deben ser aceptadas, editadas o rechazadas por una persona antes de usarse para pruebas dinámicas.
+
+Si tienes Ollama arrancado en local, puedes pedir sugerencias semánticas adicionales:
+
+```bash
+proofsec contract ./demo-app \
+  --stack spring-boot \
+  --ollama \
+  --ollama-model llama3.1 \
+  --out deliverables/proofsec/security-contract.yml
+```
+
+Las sugerencias de Ollama se validan como JSON, se filtran contra recursos/acciones detectados y se guardan únicamente como `source: inferred` y `status: proposed`.
+
+Para revisar invariantes y preparar cuáles podrán alimentar pruebas dinámicas:
+
+```bash
+proofsec contract ./demo-app \
+  --stack spring-boot \
+  --out deliverables/proofsec/security-contract.json
+
+proofsec invariants \
+  --contract deliverables/proofsec/security-contract.json \
+  --model deliverables/proofsec/security-model.json \
+  --confirm inv_xxxxx \
+  --updated-contract deliverables/proofsec/security-contract-reviewed.json \
+  --out deliverables/proofsec/invariant-state.json
+```
+
+El motor de invariantes permite pasar de `proposed` a `confirmed` o `rejected`. Los estados `testing`, `respected` y `violated` quedan reservados para fases posteriores con evidencia dinámica real.
+
+Principios de ProofSec:
+
+- funcionamiento local/offline siempre que sea posible
+- ningún finding se marca como `PROVEN` sin evidencia dinámica real
+- las pruebas ofensivas futuras requerirán target autorizado explícitamente
+- tokens, cookies y secretos deberán redactarse siempre en evidencias e informes
 
 ## Qué detecta
 

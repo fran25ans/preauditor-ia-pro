@@ -22,6 +22,7 @@ MAX_POST_BYTES = 1024 * 1024
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
 GENERATED_ARTIFACT_ROOTS = {(APP_ROOT / "deliverables").resolve()}
 MOBILE_EXTENSIONS = mobile_release_radar.ANDROID_EXTENSIONS | mobile_release_radar.IOS_EXTENSIONS
+POLICY_EXTENSIONS = {".json", ".yml", ".yaml"}
 
 
 def header_hostname(value: str) -> str:
@@ -82,7 +83,7 @@ def page_shell(content: str) -> bytes:
     .path-picker button {{ margin-top:0; }}
     .secondary {{ background:#fff; color:var(--brand); }}
     .secondary:hover {{ background:#eefaf7; color:var(--brand-dark); }}
-    .quick-actions {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }}
+    .quick-actions {{ display:grid; grid-template-columns:1fr; gap:8px; margin-bottom:8px; }}
     .note {{ border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:8px; padding:12px; font-size:13px; }}
     .empty {{ border:1px dashed var(--line); border-radius:8px; padding:18px; background:#f8fafc; }}
     .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
@@ -98,10 +99,29 @@ def page_shell(content: str) -> bytes:
     .badge {{ display:inline-block; color:#fff; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; }}
     .Critical {{ background:var(--critical); }} .High {{ background:var(--high); }} .Medium {{ background:var(--medium); }} .Low {{ background:var(--low); }}
     .delta {{ border:1px solid #99f6e4; background:#f0fdfa; border-radius:8px; padding:14px; margin:12px 0 18px; }}
+    .delta.active {{ border-color:#0f766e; background:#ecfdf5; }}
+    .delta.warning {{ border-color:#facc15; background:#fffbeb; }}
+    .delta-title {{ display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }}
+    .delta-title strong {{ font-size:16px; }}
+    .delta-status {{ border-radius:999px; padding:5px 9px; background:#fff; border:1px solid var(--line); font-size:12px; font-weight:700; color:var(--brand-dark); }}
+    .swap-warning {{ border:1px solid #facc15; background:#fffbeb; color:#854d0e; border-radius:8px; padding:10px; margin:10px 0; font-size:13px; }}
+    .build-pair {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }}
+    .build-pair div {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; min-width:0; }}
+    .build-pair span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
+    .build-pair code {{ display:block; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
     .delta-grid {{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }}
     .delta-grid div {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; }}
     .delta-grid span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
     .delta-grid strong {{ display:block; margin-top:4px; font-size:20px; }}
+    .check {{ display:flex; gap:8px; align-items:center; font-size:13px; font-weight:700; margin:12px 0 5px; }}
+    .check input {{ width:auto; }}
+    .checklist {{ display:grid; gap:8px; margin:12px 0 18px; }}
+    .check-item {{ border:1px solid var(--line); background:#fff; border-radius:8px; padding:10px; }}
+    .check-item.pass {{ border-color:#86efac; background:#f0fdf4; }}
+    .check-item.fail {{ border-color:#fecaca; background:#fef2f2; }}
+    .check-item.review {{ border-color:#fde68a; background:#fffbeb; }}
+    .timeline {{ display:grid; gap:8px; margin:12px 0 18px; }}
+    .timeline-row {{ display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; border:1px solid var(--line); background:#fff; border-radius:8px; padding:10px; }}
     .modal {{ position:fixed; inset:0; display:none; place-items:center; background:rgba(15,23,42,.42); padding:20px; z-index:20; }}
     .modal.open {{ display:grid; }}
     .modal-card {{ width:min(780px,100%); max-height:82vh; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 60px rgba(15,23,42,.24); }}
@@ -114,7 +134,7 @@ def page_shell(content: str) -> bytes:
     .browser-row button {{ width:auto; margin:0; padding:7px 10px; }}
     .error {{ color:#a31925; font-weight:700; }}
     .warning {{ border:1px solid #facc15; background:#fefce8; color:#854d0e; border-radius:8px; padding:12px; margin:10px 0; font-size:13px; }}
-    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.delta-grid {{ grid-template-columns:1fr; }} }}
+    @media (max-width:900px) {{ .topbar {{ display:block; }} .status {{ justify-content:flex-start; margin-top:12px; }} .grid,.kpis,.links,.quick-actions,.delta-grid,.build-pair {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
 <body>
@@ -138,24 +158,21 @@ def page_shell(content: str) -> bytes:
 
 
 def render_home() -> bytes:
-    demo_apk = Path("/Users/franciscojosegimenoesteban/Downloads/85.apk")
-    default_artifact = demo_apk if demo_apk.exists() else APP_ROOT
     default_output = APP_ROOT / "deliverables" / "mobile-ui-scan"
     content = f"""
 <div class="grid">
   <section class="panel">
     <h2>New Mobile Release Check</h2>
-    <p class="note">Recommended flow: select the current APK/AAB/IPA and optionally the previous build to get a before/after release delta.</p>
+    <p class="note">Recommended flow: select the newest build as Current and the older build as Previous to get a before/after release delta.</p>
     <div class="quick-actions">
-      <button type="button" id="demo-preset" class="secondary">Use 85.apk Demo</button>
-      <button type="button" id="clear-previous" class="secondary">Current Build Only</button>
+      <button type="button" id="clear-previous" class="secondary">Remove Previous Build</button>
     </div>
     <form id="scan-form">
       <div class="section">
         <h3>Artifacts</h3>
         <label>Current APK/AAB/IPA</label>
         <div class="path-picker">
-          <input name="artifact" value="{html.escape(str(default_artifact))}" required>
+          <input name="artifact" placeholder="/path/to/current.apk" required>
           <button type="button" class="browse-button" data-target="artifact" data-kind="file">Browse</button>
         </div>
         <label>Previous APK/AAB/IPA optional</label>
@@ -177,6 +194,12 @@ def render_home() -> bytes:
           <input name="output_dir" value="{html.escape(str(default_output))}" required>
           <button type="button" class="browse-button" data-target="output_dir" data-kind="folder">Browse</button>
         </div>
+        <label>Release policy JSON/YAML optional</label>
+        <div class="path-picker">
+          <input name="policy" placeholder="/path/to/mobile-release-policy.yml">
+          <button type="button" class="browse-button" data-target="policy" data-kind="policy">Browse</button>
+        </div>
+        <label class="check"><input type="checkbox" name="store_history" value="1" checked> Store app release history</label>
       </div>
       <button id="scan-button" class="primary" type="submit">Analyze Mobile Release</button>
     </form>
@@ -219,7 +242,6 @@ const browserCurrent = document.getElementById('browser-current');
 const browserList = document.getElementById('browser-list');
 let activePathInput = null;
 let activeBrowseKind = 'file';
-const demoArtifact = {json.dumps(str(demo_apk))};
 const uiToken = {json.dumps(SESSION_TOKEN)};
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (url, options = {{}}) => {{
@@ -229,6 +251,11 @@ window.fetch = (url, options = {{}}) => {{
 }};
 function escapeHtml(value) {{
   return String(value ?? '').replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
+}}
+function versionNumberFromPath(value) {{
+  const name = String(value || '').split('/').pop() || '';
+  const matches = name.match(/\\d+/g);
+  return matches && matches.length ? Number(matches[matches.length - 1]) : null;
 }}
 async function loadPath(path) {{
   browserList.innerHTML = '<div class="browser-row"><span>Loading...</span></div>';
@@ -290,11 +317,6 @@ document.getElementById('browser-close').addEventListener('click', () => browser
 browserModal.addEventListener('click', event => {{
   if (event.target === browserModal) browserModal.classList.remove('open');
 }});
-document.getElementById('demo-preset').addEventListener('click', () => {{
-  form.elements.artifact.value = demoArtifact;
-  form.elements.previous.value = '';
-  form.elements.platform.value = 'auto';
-}});
 document.getElementById('clear-previous').addEventListener('click', () => {{
   form.elements.previous.value = '';
 }});
@@ -331,6 +353,54 @@ form.addEventListener('submit', async event => {{
     const addedDangerous = data.comparison.added_dangerous_permissions.slice(0, 8).map(x => `<li><code>${{escapeHtml(x)}}</code></li>`).join('');
     const addedComponents = data.comparison.added_exported_components.slice(0, 8).map(x => `<li><code>${{escapeHtml(x)}}</code></li>`).join('');
     const addedDomains = data.comparison.added_domains.slice(0, 8).map(x => `<li><code>${{escapeHtml(x)}}</code></li>`).join('');
+    const checklist = data.store_readiness.map(item => `
+      <div class="check-item ${{escapeHtml(item.status)}}">
+        <strong>${{escapeHtml(item.title)}}</strong>
+        <p>${{escapeHtml(item.detail)}}</p>
+      </div>
+    `).join('');
+    const policyViolations = data.policy_violations.map(item => `<li>${{escapeHtml(item)}}</li>`).join('');
+    const history = data.history.slice(-8).reverse().map(entry => `
+      <div class="timeline-row">
+        <span>${{escapeHtml(entry.version_name || entry.version_code || entry.build_number || entry.artifact?.split('/').pop() || 'build')}}</span>
+        <strong>${{escapeHtml(String(entry.release_score))}}/100</strong>
+        <span class="decision ${{escapeHtml(entry.decision)}}">${{escapeHtml(entry.decision?.toUpperCase() || '')}}</span>
+      </div>
+    `).join('');
+    const comparisonActive = Boolean(data.previous_artifact);
+    const currentName = data.artifact.split('/').pop();
+    const previousName = data.previous_artifact ? data.previous_artifact.split('/').pop() : '';
+    const currentVersionNumber = versionNumberFromPath(currentName);
+    const previousVersionNumber = versionNumberFromPath(previousName);
+    const looksSwapped = comparisonActive && currentVersionNumber !== null && previousVersionNumber !== null && currentVersionNumber < previousVersionNumber;
+    const swapWarning = looksSwapped
+      ? '<div class="swap-warning"><strong>Check build order:</strong> the current build name looks older than the previous build. Use the newest build as Current and the older build as Previous.</div>'
+      : '';
+    const regressionText = comparisonActive
+      ? (data.comparison.new_findings === 0
+        ? 'No new risk findings were introduced compared with the previous build.'
+        : `${{data.comparison.new_findings}} new risk finding(s) were introduced compared with the previous build.`)
+      : 'No previous build selected. This scan can be used as the first baseline.';
+    const comparisonCard = `
+      <div class="delta ${{comparisonActive ? 'active' : 'warning'}}">
+        <div class="delta-title">
+          <strong>${{comparisonActive ? 'Comparison active' : 'Current build only'}}</strong>
+          <span class="delta-status">${{comparisonActive ? 'Regression check' : 'Baseline seed'}}</span>
+        </div>
+        ${{swapWarning}}
+        <p>${{escapeHtml(regressionText)}}</p>
+        <div class="build-pair">
+          <div><span>Current build</span><code title="${{escapeHtml(data.artifact)}}">${{escapeHtml(currentName)}}</code></div>
+          <div><span>Previous build</span><code title="${{escapeHtml(data.previous_artifact || '')}}">${{escapeHtml(previousName || 'Not selected')}}</code></div>
+        </div>
+        <div class="delta-grid">
+          <div><span>New</span><strong>${{data.comparison.new_findings}}</strong></div>
+          <div><span>Fixed</span><strong>${{data.comparison.fixed_findings}}</strong></div>
+          <div><span>Persistent</span><strong>${{data.comparison.persistent_findings}}</strong></div>
+          <div><span>New domains</span><strong>${{data.comparison.added_domains.length}}</strong></div>
+        </div>
+      </div>
+    `;
     result.innerHTML = `
       <p><span class="decision ${{escapeHtml(data.decision)}}">${{escapeHtml(data.decision.toUpperCase())}}</span></p>
       <div class="kpis">
@@ -342,16 +412,22 @@ form.addEventListener('submit', async event => {{
       </div>
       <p><strong>App:</strong> ${{escapeHtml(data.app_name || data.package_name || data.bundle_id || 'Unknown')}}</p>
       <p><strong>Artifact:</strong> <code>${{escapeHtml(data.artifact)}}</code></p>
+      ${{comparisonCard}}
       <div class="delta">
-        <p><strong>Before/after release delta</strong></p>
+        <p><strong>Mobile surface delta</strong></p>
         <div class="delta-grid">
-          <div><span>Persistent</span><strong>${{data.comparison.persistent_findings}}</strong></div>
           <div><span>New permissions</span><strong>${{data.comparison.added_permissions.length}}</strong></div>
+          <div><span>New dangerous</span><strong>${{data.comparison.added_dangerous_permissions.length}}</strong></div>
           <div><span>New exported</span><strong>${{data.comparison.added_exported_components.length}}</strong></div>
-          <div><span>New domains</span><strong>${{data.comparison.added_domains.length}}</strong></div>
+          <div><span>New libraries</span><strong>${{data.comparison.added_libraries.length}}</strong></div>
         </div>
       </div>
       <div class="links">${{files}}</div>
+      <h2>Store Readiness Checklist</h2>
+      <div class="checklist">${{checklist}}</div>
+      ${{policyViolations ? `<h2>Policy Violations</h2><div class="warning"><ul>${{policyViolations}}</ul></div>` : '<h2>Policy</h2><p>No policy violations detected.</p>'}}
+      <h2>Release History</h2>
+      ${{history ? `<div class="timeline">${{history}}</div>` : '<p>No history stored yet.</p>'}}
       ${{addedDangerous ? `<h3>New dangerous permissions</h3><ul>${{addedDangerous}}</ul>` : ''}}
       ${{addedComponents ? `<h3>New exported components</h3><ul>${{addedComponents}}</ul>` : ''}}
       ${{addedDomains ? `<h3>New domains</h3><ul>${{addedDomains}}</ul>` : ''}}
@@ -406,6 +482,8 @@ def browse_path(path_value: str, kind: str = "file") -> dict:
                 directories.append({"name": child.name, "path": str(child.resolve())})
             elif kind == "file" and child.suffix.lower() in MOBILE_EXTENSIONS:
                 files.append({"name": child.name, "path": str(child.resolve()), "size_label": size_label(child.stat().st_size)})
+            elif kind == "policy" and child.suffix.lower() in POLICY_EXTENSIONS:
+                files.append({"name": child.name, "path": str(child.resolve()), "size_label": size_label(child.stat().st_size)})
     except OSError as exc:
         raise ValueError(f"Could not read folder: {exc}") from exc
     directories.sort(key=lambda item: item["name"].lower())
@@ -426,7 +504,10 @@ def scan_mobile_release(payload: dict) -> dict:
         platform = "auto"
     current = mobile_release_radar.analyze_artifact(artifact, platform)
     previous = mobile_release_radar.analyze_artifact(previous_path, platform) if previous_path else None
-    result = mobile_release_radar.result_payload(current, previous)
+    policy_value = payload.get("policy", "").strip()
+    policy = mobile_release_radar.load_policy(Path(policy_value).expanduser().resolve() if policy_value else None)
+    history_root = output_dir / "history" if payload.get("store_history") else None
+    result = mobile_release_radar.result_payload(current, previous, policy=policy, history_root=history_root)
     files = {
         "Markdown Report": output_dir / "mobile-release-report.md",
         "HTML Report": output_dir / "mobile-release-report.html",
@@ -439,11 +520,16 @@ def scan_mobile_release(payload: dict) -> dict:
         "release_score": result["release_score"],
         "platform": current_payload["platform"],
         "artifact": current_payload["artifact"],
+        "previous_artifact": result["previous"]["artifact"] if result["previous"] else "",
         "package_name": current_payload.get("package_name", ""),
         "bundle_id": current_payload.get("bundle_id", ""),
         "app_name": current_payload.get("display_name", ""),
         "findings": current_payload["findings"],
         "comparison": result["comparison"],
+        "store_readiness": result["store_readiness"],
+        "policy_violations": result["policy_violations"],
+        "history": result["history"],
+        "history_path": result["history_path"],
         "files": {name: str(path) for name, path in files.items() if path.exists()},
     }
 

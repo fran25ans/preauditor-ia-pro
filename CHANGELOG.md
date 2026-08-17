@@ -6,6 +6,7 @@
 - Añade `mobile-release-ui`, una interfaz web local separada para analizar APK/AAB/IPA y ver la decisión de release.
 - Detecta permisos, componentes exportados, configuraciones móviles inseguras, dominios, endpoints, secretos y cambios entre builds.
 - Genera decisión preliminar de release: `APPROVED`, `NEEDS_REVIEW` o `BLOCKED`.
+- Añade checklist de preparación para tienda, política de release configurable y timeline histórico por aplicación.
 
 ## 0.2.0
 

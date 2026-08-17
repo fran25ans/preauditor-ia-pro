@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "preauditor-ia"
 version = "0.2.0"
-description = "Pre-auditor local de seguridad para APIs, CI/CD, cloud e integraciones de IA."
+description = "Pre-auditor local de seguridad con informes, mobile release checks y base ProofSec para invariantes y explotabilidad demostrable."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
   { name = "Pre-Auditor IA Pro" }
 ]
-keywords = ["security", "audit", "llm", "ci-cd", "appsec", "preauditor"]
+keywords = ["security", "audit", "llm", "ci-cd", "appsec", "preauditor", "proofsec", "authorization"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",
@@ -35,6 +35,8 @@ preauditor = "preauditor:main"
 preauditor-ui = "preauditor_ui:main"
 mobile-release-radar = "mobile_release_radar:main"
 mobile-release-ui = "mobile_release_ui:main"
+proofsec = "proofsec.cli:main"
 
 [tool.setuptools]
 py-modules = ["preauditor", "preauditor_ui", "mobile_release_radar", "mobile_release_ui"]
+packages = ["proofsec", "proofsec.discovery", "proofsec.llm"]

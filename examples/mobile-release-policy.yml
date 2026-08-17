@@ -1,0 +1,14 @@
+# Example internal Mobile Release Radar policy.
+# Values can be adjusted per app/team without changing the Python code.
+
+block_on_critical: true
+block_on_new_high: true
+block_on_debuggable: true
+block_on_cleartext: false
+block_on_new_dangerous_permissions: false
+block_on_new_exported_components: false
+
+max_new_dangerous_permissions: 3
+max_new_exported_components: 5
+max_high_findings: 10
+require_previous: false

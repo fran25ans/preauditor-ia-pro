@@ -4506,7 +4506,9 @@ def render_dashboard(
     .layout {{ display:grid; grid-template-columns:280px 1fr; gap:18px; }}
     .panel {{ padding:16px; }}
     .insights {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:0 0 18px; }}
-    .bar-row {{ display:grid; grid-template-columns:96px 1fr 42px; gap:8px; align-items:center; margin:9px 0; }}
+    .bar-row {{ display:grid; grid-template-columns:minmax(0,42%) minmax(80px,1fr) 32px; gap:8px; align-items:center; margin:9px 0; }}
+    .bar-label {{ display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+    .bar-row > strong {{ text-align:right; }}
     .bar-track {{ height:10px; background:#edf2f7; border-radius:999px; overflow:hidden; }}
     .bar-fill {{ height:100%; background:var(--brand); border-radius:999px; }}
     .bar-fill.Critica {{ background:var(--critical); }} .bar-fill.Alta {{ background:var(--high); }} .bar-fill.Media {{ background:var(--medium); }} .bar-fill.Baja {{ background:var(--low); }}
@@ -4621,7 +4623,7 @@ def render_dashboard(
     function barRows(entries, maxValue, classByLabel = false) {{
       return entries.map(([label, value]) => `
         <div class="bar-row">
-          <span>${{esc(label)}}</span>
+          <span class="bar-label" title="${{esc(label)}}">${{esc(label)}}</span>
           <div class="bar-track"><div class="bar-fill ${{classByLabel ? esc(label) : ''}}" style="width:${{maxValue ? Math.max(4, value / maxValue * 100) : 0}}%"></div></div>
           <strong>${{value}}</strong>
         </div>

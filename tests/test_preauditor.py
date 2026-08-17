@@ -14,6 +14,16 @@ import mobile_release_radar
 import mobile_release_ui
 import preauditor
 import preauditor_ui
+from proofsec.security_model import build_security_model, write_model_sqlite
+from proofsec.contract import contract_to_yaml, merge_invariants, propose_security_contract
+from proofsec.invariants import (
+    evaluate_invariants,
+    invariant_state_payload,
+    load_security_contract,
+    update_invariant_status,
+)
+from proofsec.llm.invariant_suggestions import suggest_invariants_with_llm
+from proofsec.llm.ollama import parse_json_object
 
 
 class PreauditorRuleTests(unittest.TestCase):
@@ -574,17 +584,80 @@ class MobileReleaseRadarTests(unittest.TestCase):
             previous = mobile_release_radar.analyze_artifact(self.make_apk(root, "old.apk", previous_manifest))
             current = mobile_release_radar.analyze_artifact(self.make_apk(root, "new.apk", current_manifest))
             payload = mobile_release_radar.result_payload(current, previous)
-        self.assertEqual(payload["decision"], "needs_review")
+        self.assertEqual(payload["decision"], "blocked")
+        self.assertIn("Policy blocks releases with new findings", " ".join(payload["policy_violations"]))
         self.assertGreater(payload["comparison"]["new_findings"], 0)
         self.assertGreater(payload["comparison"]["fixed_findings"], 0)
         self.assertIn("android.permission.READ_CONTACTS", payload["comparison"]["added_dangerous_permissions"])
         self.assertIn("service:.SyncService", payload["comparison"]["added_exported_components"])
+
+    def test_mobile_release_policy_blocks_regressions_only_with_previous_build(self):
+        previous_manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.demo">
+  <application />
+</manifest>
+"""
+        current_manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.demo">
+  <uses-permission android:name="android.permission.READ_CONTACTS" />
+  <application>
+    <receiver android:name=".PushReceiver" android:exported="true" />
+  </application>
+</manifest>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            policy_path = root / "mobile-policy.yml"
+            policy_path.write_text(
+                "block_on_new_dangerous_permissions: true\nmax_new_exported_components: 0\n",
+                encoding="utf-8",
+            )
+            policy = mobile_release_radar.load_policy(policy_path)
+            current = mobile_release_radar.analyze_artifact(self.make_apk(root, "current.apk", current_manifest))
+            first_payload = mobile_release_radar.result_payload(current, None, policy=policy)
+            previous = mobile_release_radar.analyze_artifact(self.make_apk(root, "previous.apk", previous_manifest))
+            compared_payload = mobile_release_radar.result_payload(current, previous, policy=policy)
+
+        first_statuses = {item["id"]: item["status"] for item in first_payload["store_readiness"]}
+        self.assertEqual(first_statuses["REL-004"], "pass")
+        self.assertEqual(first_statuses["REL-005"], "pass")
+        self.assertEqual(first_payload["policy_violations"], [])
+        self.assertEqual(compared_payload["decision"], "blocked")
+        self.assertIn("Policy blocks new dangerous permissions.", compared_payload["policy_violations"])
+        self.assertIn("Policy limit exceeded for new exported components.", compared_payload["policy_violations"])
+
+    def test_mobile_release_history_is_persisted_per_app(self):
+        manifest = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.history">
+  <application />
+</manifest>
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            current = mobile_release_radar.analyze_artifact(self.make_apk(root, "history.apk", manifest))
+            history_root = root / "history"
+            first = mobile_release_radar.result_payload(current, None, history_root=history_root)
+            second = mobile_release_radar.result_payload(current, None, history_root=history_root)
+
+        self.assertTrue(first["history_path"].endswith("com.example.history/history.jsonl"))
+        self.assertEqual(len(first["history"]), 1)
+        self.assertEqual(len(second["history"]), 2)
+        self.assertEqual(second["history"][-1]["app"], "com.example.history")
 
     def test_mobile_release_ui_renders_home(self):
         html_text = mobile_release_ui.render_home().decode("utf-8")
         self.assertIn("Mobile Release Radar", html_text)
         self.assertIn("Analyze Mobile Release", html_text)
         self.assertIn("Current APK/AAB/IPA", html_text)
+        self.assertIn("Store app release history", html_text)
+        self.assertIn("Release policy JSON/YAML", html_text)
+        self.assertIn("newest build as Current", html_text)
+        self.assertIn("Remove Previous Build", html_text)
+        self.assertIn("Check build order", html_text)
+        self.assertNotIn("Use 85.apk Demo", html_text)
+        self.assertNotIn("/Users/franciscojosegimenoesteban/Downloads/85.apk", html_text)
+        self.assertIn("Comparison active", html_text)
+        self.assertIn("No new risk findings were introduced", html_text)
 
     def test_mobile_release_ui_rejects_remote_host(self):
         with contextlib.redirect_stderr(io.StringIO()):
@@ -610,9 +683,255 @@ class MobileReleaseRadarTests(unittest.TestCase):
                 }
             )
         self.assertEqual(result["platform"], "android")
+        self.assertEqual(result["previous_artifact"], "")
+        self.assertIn("store_readiness", result)
+        self.assertIn("history", result)
         self.assertIn("HTML Report", result["files"])
         self.assertIn("Markdown Report", result["files"])
         self.assertIn("JSON Data", result["files"])
+
+
+class ProofSecSecurityModelTests(unittest.TestCase):
+    def write_spring_demo(self, root: Path) -> None:
+        app = root / "src/main/java/com/example/DemoApplication.java"
+        app.parent.mkdir(parents=True, exist_ok=True)
+        app.write_text(
+            """
+package com.example;
+
+import org.springframework.boot.SpringApplication;
+
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+""",
+            encoding="utf-8",
+        )
+        controller = root / "src/main/java/com/example/CustomerController.java"
+        controller.write_text(
+            """
+package com.example;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/customers")
+@PreAuthorize("hasRole('ADVISOR')")
+public class CustomerController {
+    @GetMapping("/{id}")
+    public Customer getCustomer(@PathVariable Long id) {
+        return service.findById(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public void deleteCustomer(@PathVariable Long id) {
+        service.delete(id);
+    }
+}
+""",
+            encoding="utf-8",
+        )
+
+    def test_proofsec_discovers_spring_security_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+
+        self.assertEqual(model.framework, "spring-boot")
+        self.assertEqual(len(model.endpoints), 2)
+        endpoint_paths = {(endpoint.method, endpoint.path) for endpoint in model.endpoints}
+        self.assertIn(("GET", "/api/customers/{id}"), endpoint_paths)
+        self.assertIn(("DELETE", "/api/customers/{id}"), endpoint_paths)
+        self.assertIn("ADVISOR", {role.name for role in model.roles})
+        self.assertIn("ADMIN", {role.name for role in model.roles})
+        self.assertIn("customers", {resource.name for resource in model.resources})
+        get_endpoint = next(endpoint for endpoint in model.endpoints if endpoint.method == "GET")
+        self.assertEqual(get_endpoint.action, "read")
+        self.assertEqual(get_endpoint.parameters, ("id",))
+
+    def test_proofsec_persists_security_model_to_sqlite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            db_path = root / "proofsec.sqlite"
+            model_id = write_model_sqlite(model, db_path)
+
+            import sqlite3
+
+            with contextlib.closing(sqlite3.connect(db_path)) as connection:
+                endpoint_count = connection.execute("select count(*) from endpoints where model_id = ?", (model_id,)).fetchone()[0]
+                edge_count = connection.execute("select count(*) from graph_edges where model_id = ?", (model_id,)).fetchone()[0]
+
+        self.assertEqual(endpoint_count, 2)
+        self.assertGreaterEqual(edge_count, 4)
+
+    def test_proofsec_proposes_security_contract_from_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            contract = propose_security_contract(model)
+
+        advisor = next(role for role in contract.roles if role.name == "ADVISOR")
+        admin = next(role for role in contract.roles if role.name == "ADMIN")
+        advisor_permissions = {permission.permission for permission in advisor.permissions}
+        admin_permissions = {permission.permission for permission in admin.permissions}
+        self.assertIn("customers.read:assigned", advisor_permissions)
+        self.assertNotIn("customers.delete:any", advisor_permissions)
+        self.assertIn("customers.delete:any", admin_permissions)
+        self.assertEqual(contract.invariants[0].source, "inferred")
+        self.assertEqual(contract.invariants[0].status, "proposed")
+        self.assertIn("assigned_customers", contract.invariants[0].name)
+
+    def test_proofsec_contract_yaml_is_human_reviewable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            contract = propose_security_contract(build_security_model(root))
+            yaml_text = contract_to_yaml(contract)
+
+        self.assertIn("roles:", yaml_text)
+        self.assertIn("ADVISOR:", yaml_text)
+        self.assertIn("permission: customers.read:assigned", yaml_text)
+        self.assertIn("invariants:", yaml_text)
+        self.assertIn("status: proposed", yaml_text)
+
+    def test_proofsec_llm_suggestions_are_schema_validated_and_proposed(self):
+        class FakeProvider:
+            name = "fake"
+            model = "unit-test"
+
+            def chat_json(self, system, user, timeout=60):
+                return {
+                    "invariants": [
+                        {
+                            "name": "advisor_customer_region_matches",
+                            "description": "Advisors should only read customers in their assigned region.",
+                            "resource": "customers",
+                            "action": "read",
+                            "expected_behavior": "Cross-region reads should be forbidden.",
+                            "confidence": 0.98,
+                            "evidence": "customers read endpoint is role protected and takes an id.",
+                        },
+                        {
+                            "name": "ignore_unknown_resource",
+                            "description": "Invalid resource must be ignored.",
+                            "resource": "payments",
+                            "action": "read",
+                            "expected_behavior": "ignored",
+                            "confidence": 1.0,
+                            "evidence": "not in model",
+                        },
+                    ]
+                }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            suggestions = suggest_invariants_with_llm(model, FakeProvider())
+
+        self.assertEqual(len(suggestions), 1)
+        self.assertEqual(suggestions[0].source, "inferred")
+        self.assertEqual(suggestions[0].status, "proposed")
+        self.assertEqual(suggestions[0].confidence, 0.65)
+        self.assertIn("fake/unit-test", suggestions[0].evidence)
+
+    def test_proofsec_merges_llm_invariants_without_duplicates(self):
+        class DuplicateProvider:
+            name = "fake"
+            model = "unit-test"
+
+            def chat_json(self, system, user, timeout=60):
+                return {
+                    "invariants": [
+                        {
+                            "name": "advisor_can_only_access_assigned_customers",
+                            "description": "Duplicate deterministic invariant.",
+                            "resource": "customers",
+                            "action": "read",
+                            "expected_behavior": "Forbidden.",
+                            "confidence": 0.5,
+                            "evidence": "duplicate",
+                        }
+                    ]
+                }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            contract = propose_security_contract(model)
+            merged = merge_invariants(contract, suggest_invariants_with_llm(model, DuplicateProvider()))
+
+        self.assertEqual(len(merged.invariants), 1)
+        self.assertEqual(merged.invariants[0].name, "advisor_can_only_access_assigned_customers")
+
+    def test_proofsec_ollama_parser_extracts_json_object(self):
+        parsed = parse_json_object('Respuesta:\n{"invariants":[]}')
+        self.assertEqual(parsed, {"invariants": []})
+
+    def test_proofsec_invariant_engine_marks_proposed_as_needing_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            contract = propose_security_contract(model)
+            evaluations = evaluate_invariants(contract, model)
+
+        self.assertEqual(evaluations[0].status, "proposed")
+        self.assertEqual(evaluations[0].readiness, "needs_confirmation")
+        self.assertTrue(evaluations[0].requires_dynamic_test)
+        self.assertIn("GET /api/customers/{id}", evaluations[0].matching_endpoints)
+
+    def test_proofsec_invariant_engine_confirms_and_rejects_invariants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            contract = propose_security_contract(model)
+            invariant_id = contract.invariants[0].invariant_id
+            confirmed = update_invariant_status(contract, invariant_id, "confirmed")
+            confirmed_evaluation = evaluate_invariants(confirmed, model)[0]
+            rejected = update_invariant_status(confirmed, invariant_id, "rejected")
+            rejected_evaluation = evaluate_invariants(rejected, model)[0]
+
+        self.assertEqual(confirmed_evaluation.status, "confirmed")
+        self.assertEqual(confirmed_evaluation.readiness, "ready_for_testing")
+        self.assertEqual(rejected_evaluation.status, "rejected")
+        self.assertEqual(rejected_evaluation.readiness, "not_testable")
+
+    def test_proofsec_invariant_engine_rejects_manual_dynamic_statuses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            contract = propose_security_contract(build_security_model(root))
+            invariant_id = contract.invariants[0].invariant_id
+
+        with self.assertRaises(ValueError):
+            update_invariant_status(contract, invariant_id, "violated")
+
+    def test_proofsec_invariant_state_roundtrip_from_json_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_spring_demo(root)
+            model = build_security_model(root)
+            contract = propose_security_contract(model)
+            contract_path = root / "contract.json"
+            contract.write_json(contract_path)
+            loaded = load_security_contract(contract_path)
+            evaluations = evaluate_invariants(loaded, model)
+            payload = invariant_state_payload(loaded, evaluations)
+
+        self.assertEqual(payload["status_counts"]["proposed"], 1)
+        self.assertEqual(payload["readiness_counts"]["needs_confirmation"], 1)
+        self.assertEqual(payload["invariants"][0]["name"], "advisor_can_only_access_assigned_customers")
 
 
 if __name__ == "__main__":
