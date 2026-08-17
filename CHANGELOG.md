@@ -25,6 +25,9 @@
 - Expone métricas explicables de ownership: observaciones, matches, ambiguos, semántica y confianza.
 - Añade batería adversarial para ProofSec y corrige falsos `PROVEN` por metadata con `id/owner`.
 - Endurece Response Shape Discovery para no confundir colecciones de `links` con recursos en respuestas paginadas.
+- Endurece BOLA con contexto estructural positivo: `context`, `extra`, `info`, `audit.requested` o `data.previous` no pueden producir `PROVEN`.
+- Cambia discovery para fallar cerrado con `id_field: null` cuando no hay identificador fiable, en vez de inventar `id`.
+- Penaliza ownership ambiguo cuando varios campos de un mismo objeto correlacionan con identidades diferentes.
 
 ## 0.2.0
 

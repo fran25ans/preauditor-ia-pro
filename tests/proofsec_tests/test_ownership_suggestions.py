@@ -64,6 +64,40 @@ class ProofSecOwnershipSuggestionTests(unittest.TestCase):
 
         self.assertFalse(any(item.field == "assignedTo" and item.confidence >= 0.85 for item in suggestions))
 
+    def test_multiple_identity_fields_in_same_object_are_ambiguous(self):
+        identities = self.identities()
+        suggestions = suggest_owner_fields_from_observations(
+            "customers",
+            [
+                (
+                    {
+                        "id": "202",
+                        "advisorId": "98371",
+                        "createdBy": "4001",
+                    },
+                    identities["advisor_b"],
+                )
+            ],
+            identities,
+        )
+
+        advisor = next(item for item in suggestions if item.field == "advisorId")
+        self.assertGreaterEqual(advisor.ambiguous_matches, 1)
+        self.assertLess(advisor.confidence, 0.85)
+
+    def test_outlier_is_explained_and_does_not_look_perfect(self):
+        identities = self.identities()
+        observations = [({"id": str(index), "managerId": "4001"}, identities["advisor_a"]) for index in range(9)]
+        observations.append(({"id": "10", "managerId": "98371"}, identities["advisor_a"]))
+
+        suggestions = suggest_owner_fields_from_observations("customers", observations, identities)
+
+        manager = next(item for item in suggestions if item.field == "managerId")
+        self.assertEqual(manager.observations, 10)
+        self.assertEqual(manager.owner_matches, 9)
+        self.assertGreaterEqual(manager.ambiguous_matches, 1)
+        self.assertLess(manager.confidence, 0.95)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -121,6 +121,8 @@ NON_RESOURCE_PATH_PARTS = {
     "debug",
     "trace",
 }
+POSITIVE_RESOURCE_PATH_PARTS = {"data", "result", "resource", "item", "content", "results", "items"}
+RESOURCE_COLLECTION_PATH_PARTS = {"data", "content", "results", "items"}
 
 
 def iter_json_objects_with_path(value: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], dict[str, Any]]]:
@@ -137,6 +139,19 @@ def iter_json_objects_with_path(value: Any, path: tuple[str, ...] = ()) -> list[
 
 def is_non_resource_path(path: tuple[str, ...]) -> bool:
     return any(part.lower() in NON_RESOURCE_PATH_PARTS for part in path)
+
+
+def is_positive_resource_path(path: tuple[str, ...]) -> bool:
+    if not path:
+        return True
+    lowered = tuple(part.lower() for part in path)
+    if is_non_resource_path(lowered):
+        return False
+    if len(lowered) == 1 and lowered[0] in POSITIVE_RESOURCE_PATH_PARTS:
+        return True
+    if len(lowered) == 2 and lowered[0] in RESOURCE_COLLECTION_PATH_PARTS and lowered[1].isdigit():
+        return True
+    return False
 
 
 def object_contains_resource_id(value: dict[str, Any], resource_id: str) -> bool:
@@ -178,7 +193,7 @@ def find_resource_object(parsed: Any, resource: ProofSecResourceExample) -> dict
     if contains_error_semantics(parsed):
         return None
     for path, item in iter_json_objects_with_path(parsed):
-        if is_non_resource_path(path):
+        if not is_positive_resource_path(path):
             continue
         if object_contains_resource_id(item, resource.resource_id):
             return item

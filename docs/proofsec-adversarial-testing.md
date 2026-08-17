@@ -20,6 +20,10 @@ This document records adversarial cases used to reduce false `PROVEN` results in
 | Response shape | Spring-style `content` with pagination links | Select `content`, not `links` |
 | Response shape | Empty `content` with pagination links | Select `content`, not `links` |
 | Response shape | Only ownership-like fields exist, such as `advisorId` | Do not accept it as the resource id |
+| Response shape | No reliable id candidate exists | `id_field: null` / needs confirmation |
+| BOLA validation | `context`, `extra`, `info`, `audit.requested` or `requestedResource` contain target id and owner | Not `PROVEN` |
+| BOLA validation | `data.previous` contains target id and owner but current resource is null | Not `PROVEN` |
+| Ownership | Multiple identity-correlated fields in the same object point to different identities | Penalized as ambiguous |
 | Ownership | `managerId` correlates with `identity.attributes.user_id` | High-confidence suggestion |
 | Ownership | One-off random match | Low confidence |
 | Ownership | Crossed/ambiguous identity matches | Penalized confidence |
@@ -28,8 +32,9 @@ This document records adversarial cases used to reduce false `PROVEN` results in
 
 - Metadata objects such as `meta.id` + `meta.owner` could be mistaken for a returned resource. The BOLA validator now ignores non-resource paths such as `meta`, `page`, `pagination`, `links`, `_links`, `debug` and `trace`.
 - Empty paginated responses could select `links` as the collection path. Response shape discovery now penalizes link collections and prefers known resource collection keys such as `content`, `data`, `results` and `items`.
+- BOLA validation now requires positive structural context for the returned resource: root object, direct `data`/`result` wrappers, or items inside resource collection wrappers.
+- Response shape discovery now fails closed with `id_field: null` when the best candidate is too weak.
 
 ## Principle
 
 When evidence is incomplete, ProofSec should prefer `VALIDATED` or `INCONCLUSIVE` over `PROVEN`.
-

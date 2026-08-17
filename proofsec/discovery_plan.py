@@ -19,7 +19,7 @@ class DiscoveryConfigSuggestion:
     resource: str
     list_endpoint: str
     items_path: str
-    id_field: str
+    id_field: str | None
     owner_fields: tuple[str, ...]
     owner_marker_fields: tuple[str, ...]
     confidence: float

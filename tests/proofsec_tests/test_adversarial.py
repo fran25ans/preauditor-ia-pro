@@ -48,6 +48,77 @@ class ProofSecAdversarialTests(unittest.TestCase):
 
         self.assertNotEqual(result.state, "PROVEN")
 
+    def test_bola_context_like_objects_do_not_become_proven(self):
+        for wrapper in ("context", "extra", "info", "requestedResource"):
+            with self.subTest(wrapper=wrapper):
+                result = validate_bola_response(
+                    evidence(200, {wrapper: {"id": "202", "owner": "advisor_b"}}),
+                    customer_202(),
+                )
+
+                self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_requested_audit_object_does_not_become_proven(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "audit": {
+                        "requested": {
+                            "id": "202",
+                            "owner": "advisor_b",
+                        }
+                    },
+                    "data": None,
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_previous_state_under_data_does_not_become_proven(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "data": {
+                        "previous": {
+                            "id": "202",
+                            "owner": "advisor_b",
+                        },
+                        "current": None,
+                    }
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_ignores_debug_resource_when_data_has_different_customer(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "data": [
+                        {
+                            "id": "101",
+                            "owner": "advisor_a",
+                        }
+                    ],
+                    "debug": {
+                        "id": "202",
+                        "owner": "advisor_b",
+                    },
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+        self.assertFalse(result.resource_id_confirmed)
+
     def test_bola_error_envelope_with_embedded_details_is_not_proven(self):
         result = validate_bola_response(
             evidence(
@@ -143,8 +214,57 @@ class ProofSecAdversarialTests(unittest.TestCase):
             has_detail_endpoint=True,
         )
 
-        self.assertNotEqual(shape.id_field, "advisorId")
+        self.assertIsNone(shape.id_field)
         self.assertLess(shape.confidence, 0.7)
+
+    def test_response_shape_conflicting_known_collection_keys_prefers_non_empty_results(self):
+        shape = infer_response_shape(
+            "customers",
+            {
+                "items": [],
+                "results": [
+                    {"id": "202", "name": "Grace"},
+                ],
+            },
+            has_detail_endpoint=True,
+        )
+
+        self.assertEqual(shape.items_path, "results")
+        self.assertEqual(shape.id_field, "id")
+
+    def test_response_shape_embedded_resource_beats_empty_content(self):
+        shape = infer_response_shape(
+            "customers",
+            {
+                "content": [],
+                "_embedded": {
+                    "customers": [
+                        {"id": "202", "name": "Grace"},
+                    ]
+                },
+            },
+            has_detail_endpoint=True,
+        )
+
+        self.assertEqual(shape.items_path, "_embedded.customers")
+        self.assertEqual(shape.id_field, "id")
+
+    def test_response_shape_does_not_invent_id_from_links_when_content_has_only_owner(self):
+        shape = infer_response_shape(
+            "customers",
+            {
+                "content": [
+                    {"advisorId": "19"},
+                ],
+                "links": [
+                    {"id": "202", "href": "/api/customers/202"},
+                ],
+            },
+            has_detail_endpoint=True,
+        )
+
+        self.assertEqual(shape.items_path, "content")
+        self.assertIsNone(shape.id_field)
 
 
 if __name__ == "__main__":

@@ -135,12 +135,18 @@ def suggest_owner_fields_from_observations(
         if not isinstance(item, dict):
             continue
         seen_fields: set[tuple[str, str]] = set()
+        item_match_fields: set[str] = set()
+        item_match_identities: set[str] = set()
+        item_matched_keys: list[tuple[str, str]] = []
         for field, value in scalar_paths(item):
             if not field or not value:
                 continue
             matches = matching_identity_attributes(value, identities)
             for matched_identity, attribute_name in matches:
                 key = (field, attribute_name)
+                item_match_fields.add(field)
+                item_match_identities.add(matched_identity)
+                item_matched_keys.append(key)
                 stats = field_stats.setdefault(
                     key,
                     {
@@ -159,6 +165,11 @@ def suggest_owner_fields_from_observations(
                 if matched_identity == observed_identity.name:
                     stats["owner_matches"] = int(stats["owner_matches"]) + 1
                 else:
+                    stats["ambiguous_matches"] = int(stats["ambiguous_matches"]) + 1
+        if len(item_match_fields) > 1 and len(item_match_identities) > 1:
+            for key in set(item_matched_keys):
+                stats = field_stats.get(key)
+                if stats is not None:
                     stats["ambiguous_matches"] = int(stats["ambiguous_matches"]) + 1
     suggestions: list[OwnershipFieldSuggestion] = []
     for (field, attribute_name), stats in field_stats.items():

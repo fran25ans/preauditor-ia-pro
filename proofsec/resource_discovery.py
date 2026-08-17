@@ -101,6 +101,8 @@ def discover_resources_with_suggestions(
             shape = infer_response_shape(resource_name, parsed, has_detail_endpoint=True)
             items_path = configured_items_path or shape.items_path
             id_field = configured_id_field if configured_id_field != "auto" else shape.id_field
+            if not id_field:
+                continue
             for item in collection_from_response(parsed, items_path):
                 if not isinstance(item, dict):
                     continue

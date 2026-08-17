@@ -26,7 +26,7 @@ class IdFieldCandidate:
 @dataclass(frozen=True)
 class ResponseShapeSuggestion:
     items_path: str
-    id_field: str
+    id_field: str | None
     confidence: float
     reason: str
     id_candidates: tuple[IdFieldCandidate, ...] = ()
@@ -158,7 +158,7 @@ def infer_id_field(
     resource: str,
     items: list[Any],
     has_detail_endpoint: bool = False,
-) -> tuple[str, tuple[IdFieldCandidate, ...]]:
+) -> tuple[str | None, tuple[IdFieldCandidate, ...]]:
     values_by_field: dict[str, list[str]] = {}
     dict_items = [item for item in items if isinstance(item, dict)]
     for item in dict_items:
@@ -174,9 +174,9 @@ def infer_id_field(
         )
     )
     if not candidates:
-        return "id", ()
+        return None, ()
     if candidates[0].confidence < 0.65:
-        return "id", candidates
+        return None, candidates
     return candidates[0].field, candidates
 
 
@@ -184,13 +184,15 @@ def infer_response_shape(resource: str, parsed: Any, has_detail_endpoint: bool =
     items_path, items, collection_confidence, collection_reason = infer_items_collection(parsed)
     id_field, candidates = infer_id_field(resource, items, has_detail_endpoint)
     id_confidence = candidates[0].confidence if candidates else 0.35
-    if candidates and id_field != candidates[0].field:
+    if id_field is None:
+        id_confidence = 0.0
+    elif candidates and id_field != candidates[0].field:
         id_confidence = 0.35
     confidence = round(min(0.98, (collection_confidence * 0.45) + (id_confidence * 0.55)), 2)
     return ResponseShapeSuggestion(
         items_path=items_path,
         id_field=id_field,
         confidence=confidence,
-        reason=f"{collection_reason} ID field candidate: {id_field}.",
+        reason=f"{collection_reason} ID field candidate: {id_field or 'UNKNOWN'}.",
         id_candidates=candidates[:5],
     )

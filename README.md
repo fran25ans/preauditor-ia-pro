@@ -373,9 +373,11 @@ Ejemplo de salida sugerida:
 
 Estas sugerencias no se aceptan como verdad absoluta: sirven como borrador revisable. Con runtime, el informe de discovery incluye candidatos explicables para `id_field` y ownership, por ejemplo presencia, unicidad, coincidencia semántica, matches contra identidades y matches ambiguos.
 
+Si no existe un candidato fiable para el identificador del recurso, ProofSec deja `id_field` como `null` en vez de inventar `id`. Ese discovery queda pendiente de confirmación manual y no se usa para construir recursos automáticamente.
+
 ### Batería adversarial
 
-ProofSec incluye tests adversariales para intentar producir falsos `PROVEN` con JSON engañoso, metadata, respuestas paginadas, campos ambiguos y ownership compartido. La guía viva está en [proofsec-adversarial-testing.md](/Users/franciscojosegimenoesteban/Desktop/Auditoria/docs/proofsec-adversarial-testing.md).
+ProofSec incluye tests adversariales para intentar producir falsos `PROVEN` con JSON engañoso, metadata, respuestas paginadas, campos ambiguos y ownership compartido. La guía viva está en [proofsec-adversarial-testing.md](docs/proofsec-adversarial-testing.md).
 
 ### Pruebas dinámicas BOLA/IDOR
 
