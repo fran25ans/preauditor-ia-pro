@@ -970,11 +970,13 @@ public class CustomerController {
                             "resource": "customers",
                             "id": "101",
                             "owner_identity": "advisor_a",
+                            "sensitive_markers": ["advisor_a"],
                         },
                         "customer_202": {
                             "resource": "customers",
                             "id": "202",
                             "owner_identity": "advisor_b",
+                            "sensitive_markers": ["advisor_b"],
                         },
                     },
                 },
@@ -1078,6 +1080,36 @@ public class AdminController {
         self.assertNotIn("test-token-advisor-a", preauditor.json.dumps(proof))
         self.assertIn("repository.findById", proof["suggested_fix"])
         self.assertIn("andExpect(status().isForbidden())", proof["regression_test"])
+
+    def test_proofsec_bola_does_not_mark_generic_200_body_as_proven(self):
+        class GenericHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"message":"No information available"}')
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), GenericHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                model_path, contract_path, config_path, _ = self.write_proofsec_runtime_files(root, base_url)
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 0)
+        self.assertEqual(payload["kpis"]["inconclusive"], 2)
+        self.assertEqual(payload["proofs"][0]["finding_state"], "INCONCLUSIVE")
+        self.assertEqual(payload["proofs"][0]["exploitability"], "UNKNOWN")
+        self.assertIn("requested resource id was not confirmed", payload["proofs"][0]["conclusion"])
 
     def test_proofsec_dynamic_engine_requires_explicit_authorization(self):
         with tempfile.TemporaryDirectory() as tmp:

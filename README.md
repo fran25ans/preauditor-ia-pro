@@ -401,13 +401,15 @@ proofsec test --type all --model deliverables/proofsec/security-model.json --con
 
 `bfla` prueba accesos de un rol bajo a funciones de otro rol usando endpoints de lectura. `privilege` cubre acciones mutantes como `POST`, `PUT`, `PATCH` o `DELETE`, pero queda bloqueado por defecto salvo que el runtime incluya `"allow_mutating": true`.
 
-Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`:
+Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`. Para BOLA/IDOR, `PROVEN` es estricto: no basta con `HTTP 200`; la respuesta debe confirmar el ID del recurso solicitado y una señal de ownership del recurso ajeno.
 
 ```text
 SECURITY INVARIANT VIOLATED
 Exploitability: PROVEN
 Evidence: Captured
 ```
+
+Si la respuesta confirma el recurso pero no el owner, el estado queda como `VALIDATED`. Si solo hay `200` con un body genérico, queda como `INCONCLUSIVE`.
 
 El proof incluye request/response redactados, identidad abstracta, recurso, owner esperado, resultado real, código afectado aproximado, propuesta de fix y test de regresión MockMvc conceptual.
 
@@ -430,6 +432,7 @@ Principios de ProofSec:
 
 - funcionamiento local/offline siempre que sea posible
 - ningún finding se marca como `PROVEN` sin evidencia dinámica real
+- BOLA/IDOR solo es `PROVEN` si el validador confirma recurso y ownership; `200 + body no vacío` no es suficiente
 - las pruebas dinámicas requieren `target.authorized: true`
 - por defecto solo se permiten targets `localhost` o `127.0.0.1`
 - solo se ejecutan pruebas de lectura para BOLA/IDOR

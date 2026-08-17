@@ -92,7 +92,7 @@ def page_shell(content: str) -> bytes:
     .note {{ border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:8px; padding:12px; font-size:13px; }}
     .warning {{ border:1px solid #facc15; background:#fffbeb; color:#854d0e; border-radius:8px; padding:12px; margin:10px 0; font-size:13px; }}
     .empty {{ border:1px dashed var(--line); border-radius:8px; padding:18px; background:#f8fafc; }}
-    .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
+    .kpis {{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; margin:12px 0 18px; }}
     .kpi {{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; min-height:78px; }}
     .kpi span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }}
     .kpi strong {{ display:block; margin-top:5px; font-size:22px; }}
@@ -101,7 +101,7 @@ def page_shell(content: str) -> bytes:
     .proof {{ border-top:1px solid var(--line); padding:12px 0; }}
     .proof:first-child {{ border-top:0; }}
     .badge {{ display:inline-block; color:#fff; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; }}
-    .proven {{ background:var(--critical); }} .fixed {{ background:var(--low); }} .unknown {{ background:var(--medium); }}
+    .proven {{ background:var(--critical); }} .validated {{ background:var(--high); }} .fixed {{ background:var(--low); }} .unknown {{ background:var(--medium); }}
     .modal {{ position:fixed; inset:0; display:none; place-items:center; background:rgba(15,23,42,.42); padding:20px; z-index:20; }}
     .modal.open {{ display:grid; }}
     .modal-card {{ width:min(780px,100%); max-height:82vh; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 60px rgba(15,23,42,.24); }}
@@ -321,6 +321,7 @@ function renderResult(payload) {{
     <div class="kpi"><span>Invariants</span><strong>${{k.invariants ?? 0}}</strong></div>
     <div class="kpi"><span>Tests</span><strong>${{k.tests_executed ?? 0}}</strong></div>
     <div class="kpi"><span>Proven</span><strong>${{k.proven_vulnerabilities ?? 0}}</strong></div>
+    <div class="kpi"><span>Validated</span><strong>${{k.validated_findings ?? 0}}</strong></div>
   </div>${{warning}}
   <div class="links">
     ${{artifactLink(proofLinks.model, 'Security Model JSON')}}
@@ -389,6 +390,7 @@ def proofsec_run(data: dict) -> dict:
             "confirmed_invariants": contract_kpis["confirmed_invariants"],
             "tests_executed": proof_kpis.get("tests_executed", 0),
             "proven_vulnerabilities": proof_kpis.get("proven_vulnerabilities", 0),
+            "validated_findings": proof_kpis.get("validated_findings", 0),
             "fixed_vulnerabilities": proof_kpis.get("fixed_vulnerabilities", 0),
             "inconclusive": proof_kpis.get("inconclusive", 0),
         },

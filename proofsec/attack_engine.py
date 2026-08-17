@@ -20,6 +20,7 @@ from proofsec.models import (
     SecurityProof,
     stable_hash,
 )
+from proofsec.proof_validator import validate_bola_response
 from proofsec.regression import generate_spring_mockmvc_test
 from proofsec.remediation import suggest_fix_for_bola
 from proofsec.runtime_config import (
@@ -107,14 +108,6 @@ def redact_body(body: str) -> str:
     return trimmed
 
 
-def is_cross_owner_success(evidence: HttpExchangeEvidence, resource: ProofSecResourceExample) -> bool:
-    if evidence.status not in SUCCESS_STATUSES:
-        return False
-    if resource.resource_id and resource.resource_id in evidence.response_body_preview:
-        return True
-    return bool(evidence.response_body_preview.strip())
-
-
 def matching_confirmed_bola_invariants(contract_path: Path) -> list[ContractInvariant]:
     contract = load_security_contract(contract_path)
     return [
@@ -143,26 +136,19 @@ def build_bola_proof(
     resource: ProofSecResourceExample,
     evidence: HttpExchangeEvidence,
 ) -> SecurityProof:
-    proven = is_cross_owner_success(evidence, resource)
-    fixed = evidence.status in FORBIDDEN_STATUSES
-    if proven:
-        state = "PROVEN"
-        exploitability = "PROVEN"
-        conclusion = "SECURITY INVARIANT VIOLATED. Cross-owner resource access returned data."
-        severity = "HIGH"
-        confidence = 1.0
-    elif fixed:
-        state = "FIXED"
-        exploitability = "FIXED"
+    validation = validate_bola_response(evidence, resource)
+    state = validation.state
+    exploitability = validation.exploitability
+    severity = "HIGH"
+    confidence = validation.confidence
+    if state == "PROVEN":
+        conclusion = "SECURITY INVARIANT VIOLATED. Cross-owner resource id and ownership marker were confirmed."
+    elif state == "VALIDATED":
+        conclusion = "Cross-owner access returned the requested resource id, but ownership evidence is incomplete."
+    elif state == "FIXED":
         conclusion = "Invariant respected during this run. Cross-owner access was rejected."
-        severity = "HIGH"
-        confidence = 0.95
     else:
-        state = "LIKELY"
-        exploitability = "UNKNOWN"
-        conclusion = "Dynamic test was inconclusive and needs manual review."
-        severity = "HIGH"
-        confidence = 0.55
+        conclusion = "Dynamic BOLA test was inconclusive and needs stronger evidence."
     proof_id = "proof_" + stable_hash(
         [invariant.invariant_id, endpoint.method, endpoint.path, identity.name, resource.name, str(evidence.status)]
     )
@@ -184,7 +170,7 @@ def build_bola_proof(
         resource_owner=resource.owner_identity,
         endpoint=f"{endpoint.method} {endpoint.path}",
         classification="BOLA",
-        conclusion=conclusion,
+        conclusion=f"{conclusion} Evidence quality: {validation.reason}",
         evidence=evidence,
         affected_code=affected_code,
         suggested_fix=suggest_fix_for_bola(endpoint, invariant),
@@ -344,6 +330,7 @@ def proof_payload_dicts(proofs: list[dict], target: ProofSecTarget, limited: boo
         "kpis": {
             "tests_executed": len(proofs),
             "proven_vulnerabilities": sum(1 for proof in proofs if proof["exploitability"] == "PROVEN"),
+            "validated_findings": sum(1 for proof in proofs if proof["exploitability"] == "VALIDATED"),
             "fixed_vulnerabilities": sum(1 for proof in proofs if proof["exploitability"] == "FIXED"),
             "inconclusive": sum(1 for proof in proofs if proof["exploitability"] == "UNKNOWN"),
             "bola": sum(1 for proof in proofs if proof["classification"] == "BOLA"),

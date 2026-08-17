@@ -21,8 +21,8 @@ EdgeType = Literal[
 ContractSource = Literal["detected", "inferred", "user-confirmed"]
 ContractStatus = Literal["proposed", "confirmed", "rejected"]
 InvariantStatus = Literal["proposed", "confirmed", "rejected", "testing", "respected", "violated", "unknown"]
-Exploitability = Literal["UNVERIFIED", "PROVEN", "FIXED", "UNKNOWN"]
-FindingState = Literal["POTENTIAL", "LIKELY", "PROVEN", "FALSE_POSITIVE", "FIXED"]
+Exploitability = Literal["UNVERIFIED", "VALIDATED", "PROVEN", "FIXED", "UNKNOWN"]
+FindingState = Literal["POTENTIAL", "LIKELY", "VALIDATED", "PROVEN", "INCONCLUSIVE", "FALSE_POSITIVE", "FIXED"]
 
 
 def utc_now() -> str:

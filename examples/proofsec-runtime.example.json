@@ -27,12 +27,14 @@
     "customer_101": {
       "resource": "customers",
       "id": "101",
-      "owner_identity": "advisor_a"
+      "owner_identity": "advisor_a",
+      "sensitive_markers": ["advisor_a"]
     },
     "customer_202": {
       "resource": "customers",
       "id": "202",
-      "owner_identity": "advisor_b"
+      "owner_identity": "advisor_b",
+      "sensitive_markers": ["advisor_b"]
     }
   }
 }
