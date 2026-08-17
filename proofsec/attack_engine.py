@@ -64,6 +64,48 @@ def matching_read_endpoints(model_path: Path, invariant: ContractInvariant) -> l
     ]
 
 
+def dynamic_bola_invariants_from_resources(
+    model_path: Path,
+    resources: list[ProofSecResourceExample],
+) -> list[ContractInvariant]:
+    """Build test hypotheses from high-confidence dynamic ownership discovery."""
+    model = load_security_model(model_path)
+    resources_with_detail_endpoints = {
+        endpoint.resource
+        for endpoint in model.endpoints
+        if endpoint.action == "read" and endpoint.method in READ_METHODS and endpoint.parameters
+    }
+    candidates: dict[str, ContractInvariant] = {}
+    for resource in resources:
+        if resource.resource not in resources_with_detail_endpoints:
+            continue
+        if resource.owner_identity == "UNKNOWN" or resource.ownership_confidence < 0.85:
+            continue
+        invariant_id = "dyn_inv_" + stable_hash(["bola", resource.resource, resource.ownership_source])
+        candidates.setdefault(
+            resource.resource,
+            ContractInvariant(
+                invariant_id=invariant_id,
+                name=f"dynamic_{resource.resource}_owner_access_only",
+                description=(
+                    f"{resource.resource} records discovered with high-confidence ownership should only be readable "
+                    "by their owning identity."
+                ),
+                resource=resource.resource,
+                action="read",
+                expected_behavior="Cross-owner access should be rejected with 403 Forbidden or equivalent.",
+                source="inferred",
+                confidence=0.86,
+                status="confirmed",
+                evidence=(
+                    "Dynamic resource discovery inferred ownership from "
+                    f"{resource.ownership_source}; this is a test hypothesis, not a human-confirmed contract rule."
+                ),
+            ),
+        )
+    return sorted(candidates.values(), key=lambda item: item.name)
+
+
 def build_bola_proof(
     invariant: ContractInvariant,
     endpoint: EndpointNode,
@@ -84,6 +126,8 @@ def build_bola_proof(
         conclusion = "Invariant respected during this run. Cross-owner access was rejected."
     else:
         conclusion = "Dynamic BOLA test was inconclusive and needs stronger evidence."
+    if invariant.invariant_id.startswith("dyn_inv_"):
+        conclusion += " The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule."
     proof_id = "proof_" + stable_hash(
         [invariant.invariant_id, endpoint.method, endpoint.path, identity.name, resource.name, str(evidence.status)]
     )
@@ -190,6 +234,8 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
     proofs: list[SecurityProof] = []
     requests_executed = 0
     invariants = matching_confirmed_bola_invariants(contract_path)
+    if not invariants:
+        invariants = dynamic_bola_invariants_from_resources(model_path, resources)
     for invariant in invariants:
         for endpoint in matching_read_endpoints(model_path, invariant):
             for identity in identities.values():
@@ -200,7 +246,7 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
                         continue
                     if identity.name in resource.observed_by:
                         continue
-                    if identity.role not in endpoint.roles:
+                    if endpoint.roles and identity.role not in endpoint.roles:
                         continue
                     if requests_executed >= target.max_requests:
                         return proof_payload(proofs, target, limited=True, resource_discovery_suggestions=discovery_suggestions)

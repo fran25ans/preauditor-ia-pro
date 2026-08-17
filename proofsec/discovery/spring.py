@@ -93,9 +93,28 @@ def infer_resource(path: str) -> str:
     parts = [part for part in path.strip("/").split("/") if part and not part.startswith("{")]
     if parts and parts[0] == "api" and len(parts) > 1:
         parts = parts[1:]
+    while parts and re.fullmatch(r"v\d+", parts[0].lower()):
+        parts = parts[1:]
     if not parts:
         return "unknown"
-    return parts[0].replace("-", "_").lower()
+    action_like_tails = {
+        "active",
+        "activos",
+        "assigned",
+        "buscar",
+        "by-username",
+        "check",
+        "filter",
+        "filtrar",
+        "listar",
+        "mine",
+        "obtener",
+        "search",
+    }
+    resource = parts[-1]
+    if len(parts) > 1 and resource.lower() in action_like_tails:
+        resource = parts[-2]
+    return resource.replace("-", "_").lower()
 
 
 def infer_action(method: str) -> str:

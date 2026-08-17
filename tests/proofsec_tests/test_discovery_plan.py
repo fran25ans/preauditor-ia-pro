@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from proofsec.discovery_plan import suggest_discovery_config, write_discovery_config_suggestions_with_runtime
+from proofsec.discovery.spring import infer_resource
 from proofsec.models import EndpointNode, ProjectSecurityModel
 from proofsec.response_shape import infer_response_shape
 
@@ -65,6 +66,27 @@ class ProofSecDiscoveryPlanTests(unittest.TestCase):
         self.assertEqual(shape.items_path, "content")
         self.assertEqual(shape.id_field, "customerId")
         self.assertGreater(shape.id_candidates[0].confidence, shape.id_candidates[1].confidence)
+
+    def test_response_shape_detects_reference_key_and_code_ids(self):
+        clients = infer_response_shape(
+            "clients",
+            {"content": [{"clientRef": "C-1", "responsible": "E-1"}, {"clientRef": "C-2", "responsible": "E-2"}]},
+            has_detail_endpoint=True,
+        )
+        notes = infer_response_shape(
+            "notes",
+            {"_embedded": {"notes": [{"noteKey": "N-A", "createdBy": "a"}, {"noteKey": "N-B", "createdBy": "b"}]}},
+            has_detail_endpoint=True,
+        )
+        projects = infer_response_shape(
+            "projects",
+            [{"projectCode": "PR-A", "name": "A"}, {"projectCode": "PR-B", "name": "B"}],
+            has_detail_endpoint=True,
+        )
+
+        self.assertEqual(clients.id_field, "clientRef")
+        self.assertEqual(notes.id_field, "noteKey")
+        self.assertEqual(projects.id_field, "projectCode")
 
     def test_runtime_discovery_enhances_shape_and_ownership_fields(self):
         class ContentHandler(BaseHTTPRequestHandler):
@@ -154,6 +176,56 @@ class ProofSecDiscoveryPlanTests(unittest.TestCase):
         suggestion = payload["suggestions"][0]
         self.assertTrue(suggestion["id_candidates"])
         self.assertTrue(suggestion["owner_field_suggestions"])
+
+    def test_infers_versioned_and_assigned_resource_names(self):
+        self.assertEqual(infer_resource("/api/v2/portfolio/clients"), "clients")
+        self.assertEqual(infer_resource("/api/v2/portfolio/clients/{clientRef}"), "clients")
+        self.assertEqual(infer_resource("/api/projects/assigned"), "projects")
+
+    def test_suggests_assigned_collection_when_detail_endpoint_exists(self):
+        model = ProjectSecurityModel(
+            project_path="/workspace/demo",
+            framework="spring-boot",
+            endpoints=[
+                EndpointNode(
+                    method="GET",
+                    path="/api/projects/assigned",
+                    controller="ProjectController",
+                    handler="assigned",
+                    file="ProjectController.java",
+                    line=10,
+                    resource="projects",
+                    action="read",
+                ),
+                EndpointNode(
+                    method="GET",
+                    path="/api/projects/{projectCode}",
+                    controller="ProjectController",
+                    handler="detail",
+                    file="ProjectController.java",
+                    line=20,
+                    resource="projects",
+                    action="read",
+                    parameters=("projectCode",),
+                ),
+                EndpointNode(
+                    method="GET",
+                    path="/health",
+                    controller="HealthController",
+                    handler="health",
+                    file="HealthController.java",
+                    line=30,
+                    resource="health",
+                    action="read",
+                ),
+            ],
+        )
+
+        payload = suggest_discovery_config(model)
+
+        self.assertIn("projects", payload["discovery"])
+        self.assertEqual(payload["discovery"]["projects"]["list_endpoint"], "/api/projects/assigned")
+        self.assertNotIn("health", payload["discovery"])
 
 
 if __name__ == "__main__":

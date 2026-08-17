@@ -58,7 +58,17 @@ def is_collection_get(endpoint: EndpointNode) -> bool:
     if endpoint.resource in {"", "unknown"}:
         return False
     tail = endpoint.path.rstrip("/").rsplit("/", 1)[-1]
-    return "{" not in endpoint.path and tail.lower() == endpoint.resource.lower()
+    if "{" in endpoint.path:
+        return False
+    return tail.lower() == endpoint.resource.lower() or tail.lower() in {
+        "assigned",
+        "mine",
+        "search",
+        "filter",
+        "filtrar",
+        "listar",
+        "obtener",
+    }
 
 
 def detail_endpoints_for(model: ProjectSecurityModel, resource: str) -> tuple[str, ...]:
@@ -76,6 +86,8 @@ def suggest_discovery_config(model: ProjectSecurityModel) -> dict[str, object]:
         if not is_collection_get(endpoint):
             continue
         detail_endpoints = detail_endpoints_for(model, endpoint.resource)
+        if not detail_endpoints:
+            continue
         confidence = 0.82 + (0.08 if detail_endpoints else 0.0)
         if endpoint.roles:
             confidence += 0.04

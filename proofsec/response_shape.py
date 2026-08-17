@@ -123,9 +123,15 @@ def score_id_field(
     if lowered == f"{resource_singular}id" or lowered == f"{resource_singular}_id":
         score += 0.36
         reasons.append("field name matches the resource id")
+    elif lowered == f"{resource_singular}ref" or lowered == f"{resource_singular}key" or lowered == f"{resource_singular}code":
+        score += 0.34
+        reasons.append("field name matches the resource reference")
     elif lowered.endswith("id") or lowered.endswith("_id"):
         score += 0.18
         reasons.append("field name ends with id")
+    elif lowered.endswith("ref") or lowered.endswith("key") or lowered.endswith("code"):
+        score += 0.2
+        reasons.append("field name looks like a stable resource reference")
     if "owner" in lowered or "advisor" in lowered or "manager" in lowered or "assigned" in lowered or "createdby" in lowered:
         score -= 0.18
         reasons.append("field looks more like ownership than resource identity")

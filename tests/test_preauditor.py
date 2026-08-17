@@ -1208,6 +1208,93 @@ public class AdminController {
         self.assertEqual(tested_resources, {"customer_101", "customer_202"})
         self.assertIn("ownership marker", payload["proofs"][0]["conclusion"])
 
+    def test_proofsec_bola_uses_dynamic_discovery_hypothesis_without_manual_invariant(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                from proofsec.models import EndpointNode, ProjectSecurityModel, ResourceNode, SecurityContract
+
+                root = Path(tmp)
+                model = ProjectSecurityModel(
+                    project_path=str(root),
+                    framework="spring-boot",
+                    languages=("java",),
+                    endpoints=[
+                        EndpointNode(
+                            method="GET",
+                            path="/api/customers",
+                            controller="CustomerController",
+                            handler="list",
+                            file=str(root / "CustomerController.java"),
+                            line=10,
+                            resource="customers",
+                            action="read",
+                        ),
+                        EndpointNode(
+                            method="GET",
+                            path="/api/customers/{id}",
+                            controller="CustomerController",
+                            handler="detail",
+                            file=str(root / "CustomerController.java"),
+                            line=20,
+                            resource="customers",
+                            action="read",
+                            parameters=("id",),
+                        ),
+                    ],
+                    resources=[ResourceNode("customers")],
+                )
+                contract = SecurityContract(
+                    project_path=str(root),
+                    resources=["customers"],
+                    invariants=[],
+                    notes=["No human-confirmed invariants in this blind test."],
+                )
+                model_path = root / "model.json"
+                contract_path = root / "contract.json"
+                config_path = root / "runtime-discovery-empty-contract.json"
+                model.write_json(model_path)
+                contract.write_json(contract_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {
+                                "base_url": f"http://127.0.0.1:{server.server_port}",
+                                "authorized": True,
+                                "max_requests": 10,
+                            },
+                            "identities": {
+                                "advisor_a": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                                },
+                                "advisor_b": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-b"},
+                                },
+                            },
+                            "discovery": {
+                                "customers": {
+                                    "list_endpoint": "/api/customers",
+                                    "items_path": "data",
+                                    "id_field": "id",
+                                    "owner_marker_fields": ["owner"],
+                                }
+                            },
+                        },
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 2)
+        self.assertTrue(all(proof["invariant_id"].startswith("dyn_inv_") for proof in payload["proofs"]))
+        self.assertIn("test hypothesis", payload["proofs"][0]["conclusion"])
+
     def test_proofsec_bola_discovery_resolves_owner_from_identity_attributes(self):
         class AttributeOwnerHandler(BaseHTTPRequestHandler):
             def log_message(self, format, *args):

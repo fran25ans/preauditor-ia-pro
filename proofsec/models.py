@@ -245,6 +245,8 @@ class ProofSecResourceExample:
     resource: str
     resource_id: str
     owner_identity: str
+    id_field: str = ""
+    owner_fields: tuple[str, ...] = ()
     observed_by: tuple[str, ...] = ()
     ownership_source: str = "manual"
     ownership_confidence: float = 1.0

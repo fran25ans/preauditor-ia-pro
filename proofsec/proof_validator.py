@@ -173,10 +173,39 @@ def object_contains_resource_id(value: dict[str, Any], resource_id: str) -> bool
     return False
 
 
+def value_at_path(value: Any, dotted_path: str) -> Any:
+    current = value
+    for part in dotted_path.split("."):
+        if part == "":
+            continue
+        if isinstance(current, dict):
+            current = current.get(part)
+        else:
+            return None
+    return current
+
+
+def object_contains_resource_identifier(value: dict[str, Any], resource: ProofSecResourceExample) -> bool:
+    if resource.id_field:
+        configured_value = value_at_path(value, resource.id_field)
+        if configured_value is not None and normalize(configured_value) == normalize(resource.resource_id):
+            return True
+    return object_contains_resource_id(value, resource.resource_id)
+
+
 def object_contains_owner_marker(value: dict[str, Any], resource: ProofSecResourceExample) -> bool:
     markers = {normalize(marker) for marker in (resource.owner_identity, *resource.sensitive_markers) if marker}
     if not markers:
         return False
+    for field in resource.owner_fields:
+        item = value_at_path(value, field)
+        if item is None:
+            continue
+        if isinstance(item, dict):
+            if any(normalize(nested) in markers for nested in walk_json_values(item)):
+                return True
+        elif normalize(item) in markers:
+            return True
     owner_keys = {
         "owner",
         "owner_id",
@@ -189,6 +218,9 @@ def object_contains_owner_marker(value: dict[str, Any], resource: ProofSecResour
         "userId",
         "customer_owner",
         "customerOwner",
+        "assignedTo",
+        "createdBy",
+        "responsible",
     }
     for key, item in value.items():
         if str(key) in owner_keys:
@@ -208,7 +240,7 @@ def find_resource_object(parsed: Any, resource: ProofSecResourceExample) -> dict
             continue
         if not path and object_has_access_decision_semantics(item):
             continue
-        if object_contains_resource_id(item, resource.resource_id):
+        if object_contains_resource_identifier(item, resource):
             return item
     return None
 

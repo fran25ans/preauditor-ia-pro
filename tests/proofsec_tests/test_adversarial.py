@@ -29,7 +29,39 @@ def customer_202() -> ProofSecResourceExample:
     )
 
 
+def client_4201() -> ProofSecResourceExample:
+    return ProofSecResourceExample(
+        name="client_C-4201",
+        resource="clients",
+        resource_id="C-4201",
+        owner_identity="bravo",
+        id_field="clientRef",
+        owner_fields=("responsible",),
+        ownership_source="response_field:responsible->identity_attribute:employee_id",
+        ownership_confidence=1.0,
+        sensitive_markers=("E-2087",),
+    )
+
+
 class ProofSecAdversarialTests(unittest.TestCase):
+    def test_bola_supports_discovered_reference_id_and_owner_fields(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "tier": "GOLD",
+                    "displayName": "Blue Harbor Clinic",
+                    "responsible": "E-2087",
+                    "clientRef": "C-4201",
+                },
+            ),
+            client_4201(),
+        )
+
+        self.assertEqual(result.state, "PROVEN")
+        self.assertTrue(result.resource_id_confirmed)
+        self.assertTrue(result.owner_confirmed)
+
     def test_bola_metadata_id_and_owner_does_not_become_proven(self):
         result = validate_bola_response(
             evidence(
