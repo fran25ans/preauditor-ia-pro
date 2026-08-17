@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "target": {
+    "base_url": "http://127.0.0.1:8082",
+    "authorized": true,
+    "dry_run": false,
+    "allow_mutating": false
+  },
+  "execution_state": "SAFE_STOP",
+  "reason": "ProofSec did not discover endpoints or resources for this FastAPI target, so dynamic validation was not executed.",
+  "kpis": {
+    "tests_executed": 0,
+    "proven_vulnerabilities": 0,
+    "validated_findings": 0,
+    "fixed_vulnerabilities": 0,
+    "inconclusive": 0,
+    "bola": 0,
+    "bfla": 0,
+    "privilege_escalation": 0
+  },
+  "proofs": []
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "project_path": "/Users/franciscojosegimenoesteban/Downloads/proofsec-blind-test-2",
+  "discovery": {
+    "caseboard": {
+      "list_endpoint": "/internal/caseboard/mine",
+      "items_path": "",
+      "id_field": null,
+      "owner_fields": [],
+      "owner_marker_fields": [
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    },
+    "documents": {
+      "list_endpoint": "/api/vault/documents",
+      "items_path": "_embedded.documents",
+      "id_field": "docRef",
+      "owner_fields": [
+        "permissions.ownerSubject"
+      ],
+      "owner_marker_fields": [
+        "permissions.ownerSubject",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "resource": "caseboard",
+      "list_endpoint": "/internal/caseboard/mine",
+      "items_path": "",
+      "id_field": null,
+      "owner_fields": [],
+      "owner_marker_fields": [
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ],
+      "confidence": 0.9,
+      "reason": "GET /internal/caseboard/mine looks like a collection endpoint for caseboard; confirm response shape and ownership fields before dynamic testing.",
+      "related_detail_endpoints": [
+        "GET /internal/caseboard/{caseRef}"
+      ],
+      "shape_reason": "No list-like collection was found in the response. ID field candidate: UNKNOWN.",
+      "id_candidates": [],
+      "owner_field_suggestions": []
+    },
+    {
+      "resource": "documents",
+      "list_endpoint": "/api/vault/documents",
+      "items_path": "_embedded.documents",
+      "id_field": "docRef",
+      "owner_fields": [
+        "permissions.ownerSubject"
+      ],
+      "owner_marker_fields": [
+        "permissions.ownerSubject",
+        "owner",
+        "owner.id",
+        "advisor.id",
+        "advisorId",
+        "managerId",
+        "assignedTo",
+        "createdBy"
+      ],
+      "confidence": 0.9,
+      "reason": "GET /api/vault/documents looks like a collection endpoint for documents; confirm response shape and ownership fields before dynamic testing.",
+      "related_detail_endpoints": [
+        "GET /api/vault/documents/{docRef}"
+      ],
+      "shape_reason": "Detected _embedded.documents as the most likely collection with 1 item(s). ID field candidate: docRef.",
+      "id_candidates": [
+        {
+          "field": "docRef",
+          "confidence": 0.74,
+          "reason": "field name looks like a stable resource reference; field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        },
+        {
+          "field": "name",
+          "confidence": 0.54,
+          "reason": "field is present in every sampled item; field is unique across sampled items; resource has a detail endpoint with a path parameter",
+          "present_ratio": 1.0,
+          "unique_ratio": 1.0
+        }
+      ],
+      "owner_field_suggestions": [
+        {
+          "resource": "documents",
+          "field": "permissions.ownerSubject",
+          "identity_attribute": "subject",
+          "matched_identity": "alpha,bravo",
+          "confidence": 0.98,
+          "reason": "Field permissions.ownerSubject matched 2/2 observed identity attribute values for subject; ambiguous matches: 0.",
+          "observations": 2,
+          "owner_matches": 2,
+          "ambiguous_matches": 0,
+          "semantic_match": true
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Generated from the static security model. A human should confirm list_endpoint, items_path, id_field and ownership fields before using it against a real target.",
+    "If owner_fields is empty, ProofSec can still propose fields dynamically by correlating responses with identity.attributes.",
+    "Runtime config was used for safe GET response shape discovery against the authorized target."
+  ]
+}

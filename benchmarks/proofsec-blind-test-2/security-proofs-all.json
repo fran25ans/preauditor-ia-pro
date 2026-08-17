@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0",
+  "target": {
+    "base_url": "http://127.0.0.1:18081",
+    "authorized": true,
+    "dry_run": false,
+    "allow_mutating": false
+  },
+  "limited_by_request_budget": false,
+  "kpis": {
+    "tests_executed": 2,
+    "proven_vulnerabilities": 0,
+    "validated_findings": 0,
+    "fixed_vulnerabilities": 2,
+    "inconclusive": 0,
+    "bola": 2,
+    "bfla": 0,
+    "privilege_escalation": 0
+  },
+  "proofs": [
+    {
+      "proof_id": "proof_776ed0638cd9c600",
+      "finding_state": "FIXED",
+      "invariant_id": "dyn_inv_087948d7127c99c3",
+      "invariant_name": "dynamic_documents_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "exploitability": "FIXED",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "403",
+      "identity": "alpha",
+      "resource": "document_DOC-B",
+      "resource_owner": "bravo",
+      "endpoint": "GET /api/vault/documents/{docRef}",
+      "classification": "BOLA",
+      "conclusion": "Invariant respected during this run. Cross-owner access was rejected. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Cross-owner request was rejected with an authorization-style status.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:18081/api/vault/documents/DOC-B",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 403,
+        "response_headers": {
+          "X-Content-Type-Options": "nosniff",
+          "X-XSS-Protection": "0",
+          "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+          "X-Frame-Options": "DENY",
+          "Content-Length": "0",
+          "Date": "Mon, 17 Aug 2026 10:39:58 GMT",
+          "Connection": "close"
+        },
+        "response_body_preview": "",
+        "error": ""
+      },
+      "affected_code": "src/main/java/local/proofsec/test2/api/VaultController.java:19",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read document records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid alpha_cannot_read_document_DOC-B_owned_by_bravo() throws Exception {\n    mockMvc.perform(get(\"/api/vault/documents/DOC-B\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"alpha\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_087948d7127c99c3\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T10:39:58.175911+00:00"
+    },
+    {
+      "proof_id": "proof_fb191e30882783e9",
+      "finding_state": "FIXED",
+      "invariant_id": "dyn_inv_087948d7127c99c3",
+      "invariant_name": "dynamic_documents_owner_access_only",
+      "vulnerability": "Broken Object Level Authorization",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "exploitability": "FIXED",
+      "expected": "403 Forbidden or equivalent denial",
+      "actual": "403",
+      "identity": "bravo",
+      "resource": "document_DOC-A",
+      "resource_owner": "alpha",
+      "endpoint": "GET /api/vault/documents/{docRef}",
+      "classification": "BOLA",
+      "conclusion": "Invariant respected during this run. Cross-owner access was rejected. The invariant was generated as a dynamic test hypothesis from resource discovery, not as a human-confirmed contract rule. Evidence quality: Cross-owner request was rejected with an authorization-style status.",
+      "evidence": {
+        "method": "GET",
+        "url": "http://127.0.0.1:18081/api/vault/documents/DOC-A",
+        "request_headers": {
+          "Authorization": "Bearer ****"
+        },
+        "status": 403,
+        "response_headers": {
+          "X-Content-Type-Options": "nosniff",
+          "X-XSS-Protection": "0",
+          "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+          "X-Frame-Options": "DENY",
+          "Content-Length": "0",
+          "Date": "Mon, 17 Aug 2026 10:39:58 GMT",
+          "Connection": "close"
+        },
+        "response_body_preview": "",
+        "error": ""
+      },
+      "affected_code": "src/main/java/local/proofsec/test2/api/VaultController.java:19",
+      "suggested_fix": "Apply the authorization check on the server side, close to the data access path.\n\nConceptual Spring Boot patch:\n```diff\n- repository.findById(id)\n+ repository.findByIdAndUserId(id, authenticatedUser.getId())\n```\n\nThe fix must guarantee that the authenticated USER can only read document records explicitly assigned to that identity. Do not rely on frontend filtering or hidden UI controls.",
+      "regression_test": "@Test\nvoid bravo_cannot_read_document_DOC-A_owned_by_alpha() throws Exception {\n    mockMvc.perform(get(\"/api/vault/documents/DOC-A\")\n            .header(\"Authorization\", \"Bearer \" + tokenFor(\"bravo\")))\n        .andExpect(status().isForbidden());\n}\n\n// Linked ProofSec invariant: dyn_inv_087948d7127c99c3\n// Expected behaviour: Cross-owner access should be rejected with 403 Forbidden or equivalent.\n",
+      "generated_at": "2026-08-17T10:39:58.178671+00:00"
+    }
+  ]
+}

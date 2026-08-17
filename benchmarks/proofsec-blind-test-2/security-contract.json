@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "project_path": "/Users/franciscojosegimenoesteban/Downloads/proofsec-blind-test-2",
+  "generated_at": "2026-08-17T10:39:00.968475+00:00",
+  "source_model_generated_at": "2026-08-17T10:38:53.390791+00:00",
+  "roles": [],
+  "resources": [
+    "caseboard",
+    "documents",
+    "export",
+    "health",
+    "record",
+    "records",
+    "tickets",
+    "whoami"
+  ],
+  "invariants": [],
+  "notes": [
+    "No role detected for GET /api/decision/record/{recordKey}; user confirmation is required.",
+    "No role detected for GET /api/vault/documents; user confirmation is required.",
+    "No role detected for GET /api/vault/documents/{docRef}; user confirmation is required.",
+    "No role detected for GET /health; user confirmation is required.",
+    "No role detected for GET /internal/caseboard/mine; user confirmation is required.",
+    "No role detected for GET /internal/caseboard/{caseRef}; user confirmation is required.",
+    "No role detected for GET /ops/system/export; user confirmation is required.",
+    "No role detected for GET /ops/tickets; user confirmation is required.",
+    "No role detected for GET /v3/session/whoami; user confirmation is required.",
+    "No role detected for GET /v3/workspaces/{tenant}/records; user confirmation is required.",
+    "No role detected for GET /v3/workspaces/{tenant}/records/{recordKey}; user confirmation is required."
+  ],
+  "kpis": {
+    "roles": 0,
+    "resources": 8,
+    "permissions": 0,
+    "invariants": 0,
+    "confirmed_invariants": 0
+  }
+}

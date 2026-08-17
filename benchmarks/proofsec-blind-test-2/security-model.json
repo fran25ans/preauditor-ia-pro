@@ -1,0 +1,399 @@
+{
+  "schema_version": "1.0",
+  "project_path": "/Users/franciscojosegimenoesteban/Downloads/proofsec-blind-test-2",
+  "generated_at": "2026-08-17T10:38:53.390791+00:00",
+  "framework": "spring-boot",
+  "languages": [
+    "java"
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/decision/record/{recordKey}",
+      "controller": "DecisionController",
+      "handler": "decision",
+      "file": "src/main/java/local/proofsec/test2/api/DecisionController.java",
+      "line": 9,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "record",
+      "action": "read",
+      "parameters": [
+        "recordKey"
+      ],
+      "id": "endpoint:f854c49e2d29ff6e"
+    },
+    {
+      "method": "GET",
+      "path": "/api/vault/documents",
+      "controller": "VaultController",
+      "handler": "list",
+      "file": "src/main/java/local/proofsec/test2/api/VaultController.java",
+      "line": 10,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "documents",
+      "action": "read",
+      "parameters": [],
+      "id": "endpoint:12cc87367d4bcada"
+    },
+    {
+      "method": "GET",
+      "path": "/api/vault/documents/{docRef}",
+      "controller": "VaultController",
+      "handler": "detail",
+      "file": "src/main/java/local/proofsec/test2/api/VaultController.java",
+      "line": 19,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "documents",
+      "action": "read",
+      "parameters": [
+        "docRef"
+      ],
+      "id": "endpoint:b16dc411f7333ebd"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "controller": "HealthController",
+      "handler": "health",
+      "file": "src/main/java/local/proofsec/test2/api/HealthController.java",
+      "line": 4,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "health",
+      "action": "read",
+      "parameters": [],
+      "id": "endpoint:5fe4d120431ce08b"
+    },
+    {
+      "method": "GET",
+      "path": "/internal/caseboard/mine",
+      "controller": "CaseController",
+      "handler": "mine",
+      "file": "src/main/java/local/proofsec/test2/api/CaseController.java",
+      "line": 10,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "caseboard",
+      "action": "read",
+      "parameters": [],
+      "id": "endpoint:9cfc4c5669ec0e48"
+    },
+    {
+      "method": "GET",
+      "path": "/internal/caseboard/{caseRef}",
+      "controller": "CaseController",
+      "handler": "detail",
+      "file": "src/main/java/local/proofsec/test2/api/CaseController.java",
+      "line": 17,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "caseboard",
+      "action": "read",
+      "parameters": [
+        "caseRef"
+      ],
+      "id": "endpoint:00db50b322170167"
+    },
+    {
+      "method": "GET",
+      "path": "/ops/system/export",
+      "controller": "AdminController",
+      "handler": "export",
+      "file": "src/main/java/local/proofsec/test2/api/AdminController.java",
+      "line": 6,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "export",
+      "action": "read",
+      "parameters": [],
+      "id": "endpoint:751cb3a269703457"
+    },
+    {
+      "method": "GET",
+      "path": "/ops/tickets",
+      "controller": "TicketController",
+      "handler": "list",
+      "file": "src/main/java/local/proofsec/test2/api/TicketController.java",
+      "line": 9,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "tickets",
+      "action": "read",
+      "parameters": [],
+      "id": "endpoint:4f16f8f5dbbbaf88"
+    },
+    {
+      "method": "GET",
+      "path": "/v3/session/whoami",
+      "controller": "ProfileController",
+      "handler": "me",
+      "file": "src/main/java/local/proofsec/test2/api/ProfileController.java",
+      "line": 6,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "whoami",
+      "action": "read",
+      "parameters": [],
+      "id": "endpoint:4414243fff9b044c"
+    },
+    {
+      "method": "GET",
+      "path": "/v3/workspaces/{tenant}/records",
+      "controller": "RecordsController",
+      "handler": "list",
+      "file": "src/main/java/local/proofsec/test2/api/RecordsController.java",
+      "line": 10,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "records",
+      "action": "read",
+      "parameters": [
+        "tenant"
+      ],
+      "id": "endpoint:8214ebf0df909d60"
+    },
+    {
+      "method": "GET",
+      "path": "/v3/workspaces/{tenant}/records/{recordKey}",
+      "controller": "RecordsController",
+      "handler": "detail",
+      "file": "src/main/java/local/proofsec/test2/api/RecordsController.java",
+      "line": 24,
+      "authorization": "unknown",
+      "roles": [],
+      "resource": "records",
+      "action": "read",
+      "parameters": [
+        "recordKey",
+        "tenant"
+      ],
+      "id": "endpoint:a2d16f074f62c270"
+    }
+  ],
+  "roles": [],
+  "resources": [
+    {
+      "name": "caseboard",
+      "source": "detected",
+      "evidence": "/internal/caseboard/{caseRef}",
+      "id": "resource:caseboard"
+    },
+    {
+      "name": "documents",
+      "source": "detected",
+      "evidence": "/api/vault/documents/{docRef}",
+      "id": "resource:documents"
+    },
+    {
+      "name": "export",
+      "source": "detected",
+      "evidence": "/ops/system/export",
+      "id": "resource:export"
+    },
+    {
+      "name": "health",
+      "source": "detected",
+      "evidence": "/health",
+      "id": "resource:health"
+    },
+    {
+      "name": "record",
+      "source": "detected",
+      "evidence": "/api/decision/record/{recordKey}",
+      "id": "resource:record"
+    },
+    {
+      "name": "records",
+      "source": "detected",
+      "evidence": "/v3/workspaces/{tenant}/records/{recordKey}",
+      "id": "resource:records"
+    },
+    {
+      "name": "tickets",
+      "source": "detected",
+      "evidence": "/ops/tickets",
+      "id": "resource:tickets"
+    },
+    {
+      "name": "whoami",
+      "source": "detected",
+      "evidence": "/v3/session/whoami",
+      "id": "resource:whoami"
+    }
+  ],
+  "edges": [
+    {
+      "source": "endpoint:00db50b322170167",
+      "target": "resource:caseboard",
+      "type": "accesses_resource",
+      "evidence": "/internal/caseboard/{caseRef}",
+      "id": "edge:e01b8f8ce0eb4b12"
+    },
+    {
+      "source": "endpoint:00db50b322170167",
+      "target": "controller:CaseController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/CaseController.java",
+      "id": "edge:1180678b15168013"
+    },
+    {
+      "source": "endpoint:12cc87367d4bcada",
+      "target": "resource:documents",
+      "type": "accesses_resource",
+      "evidence": "/api/vault/documents",
+      "id": "edge:f3288807f12b79d7"
+    },
+    {
+      "source": "endpoint:12cc87367d4bcada",
+      "target": "controller:VaultController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/VaultController.java",
+      "id": "edge:e7143cf979fa3056"
+    },
+    {
+      "source": "endpoint:4414243fff9b044c",
+      "target": "resource:whoami",
+      "type": "accesses_resource",
+      "evidence": "/v3/session/whoami",
+      "id": "edge:6915cb1c0401d0e4"
+    },
+    {
+      "source": "endpoint:4414243fff9b044c",
+      "target": "controller:ProfileController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/ProfileController.java",
+      "id": "edge:5d994817d1f949c8"
+    },
+    {
+      "source": "endpoint:4f16f8f5dbbbaf88",
+      "target": "resource:tickets",
+      "type": "accesses_resource",
+      "evidence": "/ops/tickets",
+      "id": "edge:2338134335b3128e"
+    },
+    {
+      "source": "endpoint:4f16f8f5dbbbaf88",
+      "target": "controller:TicketController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/TicketController.java",
+      "id": "edge:9ad5e1718f7e0e08"
+    },
+    {
+      "source": "endpoint:5fe4d120431ce08b",
+      "target": "resource:health",
+      "type": "accesses_resource",
+      "evidence": "/health",
+      "id": "edge:d8be673422dcdb6e"
+    },
+    {
+      "source": "endpoint:5fe4d120431ce08b",
+      "target": "controller:HealthController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/HealthController.java",
+      "id": "edge:1132ff018ecb35fb"
+    },
+    {
+      "source": "endpoint:751cb3a269703457",
+      "target": "resource:export",
+      "type": "accesses_resource",
+      "evidence": "/ops/system/export",
+      "id": "edge:e6334647e26c96d1"
+    },
+    {
+      "source": "endpoint:751cb3a269703457",
+      "target": "controller:AdminController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/AdminController.java",
+      "id": "edge:38443f4e61f126df"
+    },
+    {
+      "source": "endpoint:8214ebf0df909d60",
+      "target": "resource:records",
+      "type": "accesses_resource",
+      "evidence": "/v3/workspaces/{tenant}/records",
+      "id": "edge:9883b8dd425689ac"
+    },
+    {
+      "source": "endpoint:8214ebf0df909d60",
+      "target": "controller:RecordsController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/RecordsController.java",
+      "id": "edge:5cbef3e82ca238a2"
+    },
+    {
+      "source": "endpoint:9cfc4c5669ec0e48",
+      "target": "resource:caseboard",
+      "type": "accesses_resource",
+      "evidence": "/internal/caseboard/mine",
+      "id": "edge:a94fbea3087186e0"
+    },
+    {
+      "source": "endpoint:9cfc4c5669ec0e48",
+      "target": "controller:CaseController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/CaseController.java",
+      "id": "edge:ee9c23caa18ec51e"
+    },
+    {
+      "source": "endpoint:a2d16f074f62c270",
+      "target": "resource:records",
+      "type": "accesses_resource",
+      "evidence": "/v3/workspaces/{tenant}/records/{recordKey}",
+      "id": "edge:f3f03bbad0033c1b"
+    },
+    {
+      "source": "endpoint:a2d16f074f62c270",
+      "target": "controller:RecordsController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/RecordsController.java",
+      "id": "edge:d8203e305bd68f1d"
+    },
+    {
+      "source": "endpoint:b16dc411f7333ebd",
+      "target": "resource:documents",
+      "type": "accesses_resource",
+      "evidence": "/api/vault/documents/{docRef}",
+      "id": "edge:b695820ccc025b6f"
+    },
+    {
+      "source": "endpoint:b16dc411f7333ebd",
+      "target": "controller:VaultController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/VaultController.java",
+      "id": "edge:77c0f56df6e332c5"
+    },
+    {
+      "source": "endpoint:f854c49e2d29ff6e",
+      "target": "resource:record",
+      "type": "accesses_resource",
+      "evidence": "/api/decision/record/{recordKey}",
+      "id": "edge:fa70f2548f9e77dc"
+    },
+    {
+      "source": "endpoint:f854c49e2d29ff6e",
+      "target": "controller:DecisionController",
+      "type": "declares",
+      "evidence": "src/main/java/local/proofsec/test2/api/DecisionController.java",
+      "id": "edge:10db370705eb5066"
+    }
+  ],
+  "notes": [
+    "src/main/java/local/proofsec/test2/api/AdminController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/CaseController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/DecisionController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/HealthController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/ProfileController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/RecordsController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/TicketController.java: endpoints detected but no role annotations were found.",
+    "src/main/java/local/proofsec/test2/api/VaultController.java: endpoints detected but no role annotations were found."
+  ],
+  "kpis": {
+    "endpoints_discovered": 11,
+    "resources_discovered": 8,
+    "roles_discovered": 0,
+    "security_edges": 22
+  }
+}

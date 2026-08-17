@@ -1,0 +1,39 @@
+{
+  "target": {
+    "base_url": "http://127.0.0.1:8082",
+    "authorized": true,
+    "allow_mutating": false,
+    "max_requests": 300,
+    "timeout_seconds": 5.0
+  },
+  "identities": {
+    "alpha": {
+      "role": "ANALYST",
+      "auth": {
+        "type": "bearer",
+        "token": "t3-alpha-token"
+      },
+      "attributes": {
+        "username": "alpha.python",
+        "sub": "usr-a-701",
+        "principal_id": "P-1001",
+        "tenant": "tenant-red",
+        "team": "team-orion"
+      }
+    },
+    "bravo": {
+      "role": "ANALYST",
+      "auth": {
+        "type": "bearer",
+        "token": "t3-bravo-token"
+      },
+      "attributes": {
+        "username": "bravo.python",
+        "sub": "usr-b-909",
+        "principal_id": "P-2002",
+        "tenant": "tenant-blue",
+        "team": "team-pegasus"
+      }
+    }
+  }
+}

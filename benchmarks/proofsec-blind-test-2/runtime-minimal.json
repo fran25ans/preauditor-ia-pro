@@ -1,0 +1,39 @@
+{
+  "target": {
+    "base_url": "http://127.0.0.1:18081",
+    "authorized": true,
+    "allow_mutating": false,
+    "max_requests": 300,
+    "timeout_seconds": 5.0
+  },
+  "identities": {
+    "alpha": {
+      "role": "MEMBER",
+      "auth": {
+        "type": "bearer",
+        "token": "t2-alpha-token"
+      },
+      "attributes": {
+        "username": "alpha.user",
+        "subject": "sub-A17",
+        "member_ref": "MBR-100",
+        "tenant_id": "TEN-A",
+        "org_code": "ORG-NORTH"
+      }
+    },
+    "bravo": {
+      "role": "MEMBER",
+      "auth": {
+        "type": "bearer",
+        "token": "t2-bravo-token"
+      },
+      "attributes": {
+        "username": "bravo.user",
+        "subject": "sub-B42",
+        "member_ref": "MBR-200",
+        "tenant_id": "TEN-B",
+        "org_code": "ORG-SOUTH"
+      }
+    }
+  }
+}

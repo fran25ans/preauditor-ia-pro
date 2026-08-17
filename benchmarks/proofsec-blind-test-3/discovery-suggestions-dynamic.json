@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "project_path": "/Users/franciscojosegimenoesteban/Downloads/proofsec-blind-test-3",
+  "discovery": {},
+  "suggestions": [],
+  "notes": [
+    "Generated from the static security model. A human should confirm list_endpoint, items_path, id_field and ownership fields before using it against a real target.",
+    "If owner_fields is empty, ProofSec can still propose fields dynamically by correlating responses with identity.attributes.",
+    "Runtime config was used for safe GET response shape discovery against the authorized target."
+  ]
+}

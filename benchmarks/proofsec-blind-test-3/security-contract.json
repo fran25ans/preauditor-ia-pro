@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "project_path": "/Users/franciscojosegimenoesteban/Downloads/proofsec-blind-test-3",
+  "generated_at": "2026-08-17T10:41:12.250633+00:00",
+  "source_model_generated_at": "2026-08-17T10:41:00.426587+00:00",
+  "roles": [],
+  "resources": [],
+  "invariants": [],
+  "notes": [],
+  "kpis": {
+    "roles": 0,
+    "resources": 0,
+    "permissions": 0,
+    "invariants": 0,
+    "confirmed_invariants": 0
+  }
+}
