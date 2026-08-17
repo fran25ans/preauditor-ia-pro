@@ -8,7 +8,7 @@ import sys
 
 from proofsec.attack_engine import retest_proof, run_dynamic_tests, write_proofs
 from proofsec.contract import load_security_model, merge_invariants, propose_security_contract, write_contract
-from proofsec.discovery_plan import write_discovery_config_suggestions
+from proofsec.discovery_plan import write_discovery_config_suggestions, write_discovery_config_suggestions_with_runtime
 from proofsec.invariants import (
     confirm_all_proposed,
     evaluate_invariants,
@@ -56,6 +56,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     discovery = subparsers.add_parser("discovery", help="Suggest runtime resource discovery configuration from a security model.")
     discovery.add_argument("--model", required=True, help="ProofSec security model JSON.")
+    discovery.add_argument("--config", default=None, help="Optional authorized runtime config for safe response shape discovery.")
     discovery.add_argument("--out", default="proofsec-discovery-suggestions.json", help="Discovery suggestion JSON output path.")
 
     test = subparsers.add_parser("test", help="Run safe dynamic validation against an authorized target.")
@@ -187,7 +188,10 @@ def command_invariants(args: argparse.Namespace) -> int:
 def command_discovery(args: argparse.Namespace) -> int:
     try:
         output = Path(args.out)
-        payload = write_discovery_config_suggestions(Path(args.model), output)
+        if args.config:
+            payload = write_discovery_config_suggestions_with_runtime(Path(args.model), Path(args.config), output)
+        else:
+            payload = write_discovery_config_suggestions(Path(args.model), output)
     except Exception as exc:
         print(f"ProofSec discovery failed: {exc}", file=sys.stderr)
         return 2
@@ -195,6 +199,7 @@ def command_discovery(args: argparse.Namespace) -> int:
     suggestions = payload.get("suggestions", [])
     print("ProofSec discovery configuration suggested")
     print(f"Resources suggested: {len(suggestions)}")
+    print(f"Response shape discovery: {'enabled' if args.config else 'static only'}")
     for item in suggestions:
         if isinstance(item, dict):
             print(f"- {item.get('resource')}: {item.get('list_endpoint')} confidence={item.get('confidence')}")

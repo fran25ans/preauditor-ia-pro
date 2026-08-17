@@ -30,14 +30,13 @@ class ProofSecOwnershipSuggestionTests(unittest.TestCase):
             identities,
         )
 
-        self.assertTrue(
-            any(
-                item.field == "managerId"
-                and item.identity_attribute == "user_id"
-                and item.confidence >= 0.9
-                for item in suggestions
-            )
-        )
+        suggestion = next(item for item in suggestions if item.field == "managerId")
+        self.assertEqual(suggestion.identity_attribute, "user_id")
+        self.assertGreaterEqual(suggestion.confidence, 0.9)
+        self.assertEqual(suggestion.observations, 2)
+        self.assertEqual(suggestion.owner_matches, 2)
+        self.assertEqual(suggestion.ambiguous_matches, 0)
+        self.assertTrue(suggestion.semantic_match)
 
     def test_non_semantic_single_match_stays_lower_confidence(self):
         identities = self.identities()
@@ -68,4 +67,3 @@ class ProofSecOwnershipSuggestionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

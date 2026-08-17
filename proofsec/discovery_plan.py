@@ -7,7 +7,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from proofsec.contract import load_security_model
+from proofsec.http.client import run_http_request
 from proofsec.models import EndpointNode, ProjectSecurityModel
+from proofsec.ownership_suggestions import suggest_owner_fields_from_observations
+from proofsec.response_shape import infer_response_shape
+from proofsec.runtime_config import assert_target_authorized, auth_headers, load_identities, load_runtime_config, load_target
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,9 @@ class DiscoveryConfigSuggestion:
     confidence: float
     reason: str
     related_detail_endpoints: tuple[str, ...] = ()
+    shape_reason: str = ""
+    id_candidates: tuple[dict[str, object], ...] = ()
+    owner_field_suggestions: tuple[dict[str, object], ...] = ()
 
     def to_runtime_entry(self) -> dict[str, object]:
         return {
@@ -36,6 +43,8 @@ class DiscoveryConfigSuggestion:
         payload["owner_fields"] = list(self.owner_fields)
         payload["owner_marker_fields"] = list(self.owner_marker_fields)
         payload["related_detail_endpoints"] = list(self.related_detail_endpoints)
+        payload["id_candidates"] = list(self.id_candidates)
+        payload["owner_field_suggestions"] = list(self.owner_field_suggestions)
         return payload
 
 
@@ -74,7 +83,7 @@ def suggest_discovery_config(model: ProjectSecurityModel) -> dict[str, object]:
             resource=endpoint.resource,
             list_endpoint=normalized_collection_path(endpoint.path),
             items_path="data",
-            id_field="id",
+            id_field="auto",
             owner_fields=(),
             owner_marker_fields=("owner", "owner.id", "advisor.id", "advisorId", "managerId", "assignedTo", "createdBy"),
             confidence=round(min(confidence, 0.96), 2),
@@ -96,6 +105,67 @@ def suggest_discovery_config(model: ProjectSecurityModel) -> dict[str, object]:
     }
 
 
+def enhance_discovery_with_response_shapes(payload: dict[str, object], runtime_config: dict) -> dict[str, object]:
+    target = load_target(runtime_config)
+    assert_target_authorized(target)
+    identities = load_identities(runtime_config)
+    discovery = payload.get("discovery")
+    if not isinstance(discovery, dict):
+        return payload
+    suggestions_by_resource = {
+        str(item.get("resource")): item
+        for item in payload.get("suggestions", [])
+        if isinstance(item, dict) and item.get("resource")
+    }
+    for resource, entry in discovery.items():
+        if not isinstance(entry, dict):
+            continue
+        list_endpoint = str(entry.get("list_endpoint") or "")
+        if not list_endpoint.startswith("/"):
+            continue
+        observations = []
+        parsed_samples = []
+        for identity in identities.values():
+            evidence = run_http_request(target, "GET", target.base_url.rstrip("/") + list_endpoint, auth_headers(identity))
+            if evidence.status is None or evidence.status < 200 or evidence.status >= 300:
+                continue
+            try:
+                parsed = json.loads(evidence.response_body or evidence.response_body_preview)
+            except json.JSONDecodeError:
+                continue
+            shape = infer_response_shape(str(resource), parsed, has_detail_endpoint=True)
+            parsed_samples.append(shape)
+            from proofsec.resource_discovery import collection_from_response
+
+            for item in collection_from_response(parsed, shape.items_path):
+                if isinstance(item, dict):
+                    observations.append((item, identity))
+        if not parsed_samples:
+            continue
+        shape = sorted(parsed_samples, key=lambda item: -item.confidence)[0]
+        owner_suggestions = suggest_owner_fields_from_observations(str(resource), observations, identities)
+        owner_fields = tuple(item.field for item in owner_suggestions if item.confidence >= 0.85)
+        marker_fields = tuple(dict.fromkeys([*owner_fields, *entry.get("owner_marker_fields", [])]))
+        entry["items_path"] = shape.items_path
+        entry["id_field"] = shape.id_field
+        entry["owner_fields"] = list(owner_fields)
+        entry["owner_marker_fields"] = list(marker_fields)
+        suggestion = suggestions_by_resource.get(str(resource))
+        if suggestion is not None:
+            suggestion["items_path"] = shape.items_path
+            suggestion["id_field"] = shape.id_field
+            suggestion["owner_fields"] = list(owner_fields)
+            suggestion["owner_marker_fields"] = list(marker_fields)
+            suggestion["shape_reason"] = shape.reason
+            suggestion["id_candidates"] = [candidate.to_dict() for candidate in shape.id_candidates]
+            suggestion["owner_field_suggestions"] = [item.to_dict() for item in owner_suggestions]
+            suggestion["confidence"] = round(min(0.98, max(float(suggestion.get("confidence", 0.0)), shape.confidence)), 2)
+    notes = payload.setdefault("notes", [])
+    if isinstance(notes, list):
+        notes.append("Runtime config was used for safe GET response shape discovery against the authorized target.")
+    return payload
+
+
 def write_discovery_config_suggestions(model_path: Path, output: Path) -> dict[str, object]:
     payload = suggest_discovery_config(load_security_model(model_path))
     output = output.expanduser().resolve()
@@ -103,3 +173,11 @@ def write_discovery_config_suggestions(model_path: Path, output: Path) -> dict[s
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return payload
 
+
+def write_discovery_config_suggestions_with_runtime(model_path: Path, runtime_config_path: Path, output: Path) -> dict[str, object]:
+    payload = suggest_discovery_config(load_security_model(model_path))
+    payload = enhance_discovery_with_response_shapes(payload, load_runtime_config(runtime_config_path))
+    output = output.expanduser().resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return payload

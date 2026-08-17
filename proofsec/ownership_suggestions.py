@@ -16,6 +16,10 @@ class OwnershipFieldSuggestion:
     matched_identity: str
     confidence: float
     reason: str
+    observations: int = 0
+    owner_matches: int = 0
+    ambiguous_matches: int = 0
+    semantic_match: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -101,6 +105,10 @@ def suggest_owner_fields_for_item(
                         f"Response field {field} matched identity "
                         f"{identity_name}.{attribute_name} during discovery."
                     ),
+                    observations=1,
+                    owner_matches=1 if identity_name == observed_identity.name else 0,
+                    ambiguous_matches=0 if identity_name == observed_identity.name else 1,
+                    semantic_match=True,
                 )
             )
     deduped: dict[tuple[str, str, str, str], OwnershipFieldSuggestion] = {}
@@ -180,6 +188,10 @@ def suggest_owner_fields_from_observations(
                     f"Field {field} matched {owner_matches}/{observations} observed identity "
                     f"attribute values for {attribute_name}; ambiguous matches: {ambiguous_matches}."
                 ),
+                observations=observations,
+                owner_matches=owner_matches,
+                ambiguous_matches=ambiguous_matches,
+                semantic_match=field_has_ownership_semantics(field),
             )
         )
     return sorted(suggestions, key=lambda item: (-item.confidence, item.field, item.identity_attribute))

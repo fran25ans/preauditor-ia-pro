@@ -12,6 +12,7 @@ from proofsec.ownership_suggestions import (
     suggest_owner_fields_for_item,
     suggest_owner_fields_from_observations,
 )
+from proofsec.response_shape import infer_response_shape
 from proofsec.runtime_config import auth_headers
 
 
@@ -81,8 +82,8 @@ def discover_resources_with_suggestions(
     suggestions: list[OwnershipFieldSuggestion] = []
     for resource_name, raw in (config.get("discovery") or {}).items():
         list_endpoint = str(raw.get("list_endpoint") or "").strip()
-        id_field = str(raw.get("id_field") or "id")
-        items_path = str(raw.get("items_path") or "")
+        configured_id_field = str(raw.get("id_field") or "auto")
+        configured_items_path = str(raw.get("items_path") or "")
         marker_fields = tuple(str(item) for item in raw.get("owner_marker_fields", ["owner", "owner.id", "advisor", "advisor.id", "advisorId"]))
         configured_owner_fields = tuple(str(item) for item in raw.get("owner_fields", []))
         if not list_endpoint.startswith("/"):
@@ -97,6 +98,9 @@ def discover_resources_with_suggestions(
                 parsed = json.loads(evidence.response_body or evidence.response_body_preview)
             except json.JSONDecodeError:
                 continue
+            shape = infer_response_shape(resource_name, parsed, has_detail_endpoint=True)
+            items_path = configured_items_path or shape.items_path
+            id_field = configured_id_field if configured_id_field != "auto" else shape.id_field
             for item in collection_from_response(parsed, items_path):
                 if not isinstance(item, dict):
                     continue

@@ -21,6 +21,8 @@
 - Separa el cliente HTTP dinámico en `proofsec/http/client.py` para reducir acoplamiento entre discovery y attack engine.
 - Añade `proofsec discovery` para proponer configuración inicial de Resource Discovery desde el Security Model.
 - Añade tests específicos en `tests/proofsec_tests/` para discovery plan y correlación de ownership.
+- Añade Auto Response Shape Discovery con `proofsec discovery --config`: detecta `items_path`, puntúa `id_field` y correlaciona ownership desde respuestas reales.
+- Expone métricas explicables de ownership: observaciones, matches, ambiguos, semántica y confianza.
 
 ## 0.2.0
 

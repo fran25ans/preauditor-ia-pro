@@ -346,6 +346,15 @@ proofsec discovery \
   --out deliverables/proofsec/discovery-suggestions.json
 ```
 
+Si añades el runtime autorizado, ProofSec hace peticiones `GET` seguras a los endpoints de colección candidatos e inspecciona la forma real de la respuesta:
+
+```bash
+proofsec discovery \
+  --model deliverables/proofsec/security-model.json \
+  --config proofsec-runtime.json \
+  --out deliverables/proofsec/discovery-suggestions.json
+```
+
 Ejemplo de salida sugerida:
 
 ```json
@@ -353,16 +362,16 @@ Ejemplo de salida sugerida:
   "discovery": {
     "customers": {
       "list_endpoint": "/api/customers",
-      "items_path": "data",
-      "id_field": "id",
-      "owner_fields": [],
+      "items_path": "content",
+      "id_field": "customerId",
+      "owner_fields": ["advisorId"],
       "owner_marker_fields": ["owner", "owner.id", "advisor.id", "advisorId", "managerId", "assignedTo", "createdBy"]
     }
   }
 }
 ```
 
-Estas sugerencias no se aceptan como verdad absoluta: sirven como borrador revisable. Después, durante el discovery dinámico, ProofSec puede completar `owner_fields` correlacionando respuestas reales con `identity.attributes`.
+Estas sugerencias no se aceptan como verdad absoluta: sirven como borrador revisable. Con runtime, el informe de discovery incluye candidatos explicables para `id_field` y ownership, por ejemplo presencia, unicidad, coincidencia semántica, matches contra identidades y matches ambiguos.
 
 ### Pruebas dinámicas BOLA/IDOR
 
