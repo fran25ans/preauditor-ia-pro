@@ -1088,6 +1088,8 @@ public class AdminController {
         self.assertIn("SECURITY INVARIANT VIOLATED", proof["conclusion"])
         self.assertIn("Authorization", proof["evidence"]["request_headers"])
         self.assertEqual(proof["evidence"]["request_headers"]["Authorization"], "Bearer ****")
+        self.assertNotIn("response_body", proof["evidence"])
+        self.assertIn("response_body_preview", proof["evidence"])
         self.assertNotIn("test-token-advisor-a", preauditor.json.dumps(proof))
         self.assertIn("repository.findById", proof["suggested_fix"])
         self.assertIn("andExpect(status().isForbidden())", proof["regression_test"])
@@ -1206,6 +1208,114 @@ public class AdminController {
         self.assertEqual(tested_resources, {"customer_101", "customer_202"})
         self.assertIn("ownership marker", payload["proofs"][0]["conclusion"])
 
+    def test_proofsec_bola_discovery_skips_shared_resource_observed_by_attacker(self):
+        class SharedHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                if self.path == "/api/customers":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"data":[{"id":"500","owner":"advisor_b"}]}')
+                    return
+                if self.path == "/api/customers/500":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"id":"500","owner":"advisor_b","email":"shared@example.test"}')
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SharedHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                model = build_security_model(root)
+                contract = propose_security_contract(model)
+                contract = update_invariant_status(contract, contract.invariants[0].invariant_id, "confirmed")
+                model_path = root / "model.json"
+                contract_path = root / "contract.json"
+                config_path = root / "runtime-shared.json"
+                model.write_json(model_path)
+                contract.write_json(contract_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {"base_url": f"http://127.0.0.1:{server.server_port}", "authorized": True},
+                            "identities": {
+                                "advisor_a": {"role": "ADVISOR", "auth": {"type": "bearer", "token": "test-token-advisor-a"}},
+                                "advisor_b": {"role": "ADVISOR", "auth": {"type": "bearer", "token": "test-token-advisor-b"}},
+                            },
+                            "discovery": {
+                                "customers": {
+                                    "list_endpoint": "/api/customers",
+                                    "items_path": "data",
+                                    "id_field": "id",
+                                    "owner_fields": ["owner"],
+                                    "owner_marker_fields": ["owner"],
+                                }
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["tests_executed"], 0)
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 0)
+
+    def test_proofsec_bola_discovery_skips_unknown_owner_resources(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                model = build_security_model(root)
+                contract = propose_security_contract(model)
+                contract = update_invariant_status(contract, contract.invariants[0].invariant_id, "confirmed")
+                model_path = root / "model.json"
+                contract_path = root / "contract.json"
+                config_path = root / "runtime-unknown.json"
+                model.write_json(model_path)
+                contract.write_json(contract_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {"base_url": f"http://127.0.0.1:{server.server_port}", "authorized": True},
+                            "identities": {
+                                "advisor_a": {"role": "ADVISOR", "auth": {"type": "bearer", "token": "test-token-advisor-a"}},
+                                "advisor_b": {"role": "ADVISOR", "auth": {"type": "bearer", "token": "test-token-advisor-b"}},
+                            },
+                            "discovery": {
+                                "customers": {
+                                    "list_endpoint": "/api/customers",
+                                    "items_path": "data",
+                                    "id_field": "id",
+                                    "owner_fields": ["missingOwner"],
+                                    "owner_marker_fields": ["owner"],
+                                }
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["tests_executed"], 0)
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 0)
+
     def test_proofsec_dynamic_engine_requires_explicit_authorization(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1293,6 +1403,52 @@ public class AdminController {
         self.assertEqual(proof["vulnerability"], "Broken Function Level Authorization")
         self.assertEqual(proof["actual"], "200")
         self.assertIn("Lower-privileged identity", proof["conclusion"])
+
+    def test_proofsec_bfla_2xx_authorization_error_payload_is_not_proven(self):
+        class ErrorAdminHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"error":"You are not authorized"}')
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ErrorAdminHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                self.add_admin_controller(root)
+                model = build_security_model(root)
+                model_path = root / "model.json"
+                config_path = root / "runtime.json"
+                model.write_json(model_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {"base_url": f"http://127.0.0.1:{server.server_port}", "authorized": True},
+                            "identities": {
+                                "advisor_a": {"role": "ADVISOR", "auth": {"type": "bearer", "token": "test-token-advisor-a"}}
+                            },
+                            "resources": {
+                                "customer_101": {"resource": "customers", "id": "101", "owner_identity": "advisor_a"}
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_authorization_tests(model_path, config_path, "bfla")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 0)
+        self.assertEqual(payload["kpis"]["inconclusive"], 1)
+        self.assertEqual(payload["proofs"][0]["finding_state"], "INCONCLUSIVE")
 
     def test_proofsec_privilege_engine_skips_mutating_endpoints_by_default(self):
         server = self.run_customer_server(secure=False)

@@ -24,6 +24,14 @@ class BolaValidation:
     owner_confirmed: bool
 
 
+@dataclass(frozen=True)
+class AuthorizationValidation:
+    state: str
+    exploitability: str
+    confidence: float
+    reason: str
+
+
 def normalize(value: object) -> str:
     return str(value).strip().strip('"').strip("'")
 
@@ -159,7 +167,7 @@ def validate_bola_response(evidence: HttpExchangeEvidence, resource: ProofSecRes
             resource_id_confirmed=False,
             owner_confirmed=False,
         )
-    body = evidence.response_body_preview.strip()
+    body = (evidence.response_body or evidence.response_body_preview).strip()
     if not body:
         return BolaValidation(
             state="INCONCLUSIVE",
@@ -206,4 +214,43 @@ def validate_bola_response(evidence: HttpExchangeEvidence, resource: ProofSecRes
         resource_returned=bool(body),
         resource_id_confirmed=False,
         owner_confirmed=owner_confirmed,
+    )
+
+
+def validate_authorization_response(evidence: HttpExchangeEvidence) -> AuthorizationValidation:
+    if evidence.status in FORBIDDEN_STATUSES:
+        return AuthorizationValidation(
+            state="FIXED",
+            exploitability="FIXED",
+            confidence=0.95,
+            reason="Restricted function was rejected with an authorization-style status.",
+        )
+    if evidence.status not in SUCCESS_STATUSES:
+        return AuthorizationValidation(
+            state="INCONCLUSIVE",
+            exploitability="UNKNOWN",
+            confidence=0.35,
+            reason="The request did not return a success status or an authorization denial.",
+        )
+    body = (evidence.response_body or evidence.response_body_preview).strip()
+    parsed = parse_json_body(body)
+    if parsed is not None and contains_error_semantics(parsed):
+        return AuthorizationValidation(
+            state="INCONCLUSIVE",
+            exploitability="UNKNOWN",
+            confidence=0.45,
+            reason="The endpoint returned 2xx, but the response body has authorization-error semantics.",
+        )
+    if contains_error_semantics(body):
+        return AuthorizationValidation(
+            state="INCONCLUSIVE",
+            exploitability="UNKNOWN",
+            confidence=0.45,
+            reason="The endpoint returned 2xx, but the response text has authorization-error semantics.",
+        )
+    return AuthorizationValidation(
+        state="PROVEN",
+        exploitability="PROVEN",
+        confidence=1.0,
+        reason="Lower-privileged identity received a successful response without authorization-error semantics.",
     )

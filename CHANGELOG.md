@@ -12,6 +12,9 @@
 - Endurece el criterio `PROVEN` de BOLA/IDOR con validador de recurso y ownership; `HTTP 200` con body genérico queda como `INCONCLUSIVE`.
 - Añade validación estructural de BOLA/IDOR para evitar `PROVEN` en payloads de error que solo mencionan recurso y owner como texto.
 - Añade Resource Discovery configurado para aprender recursos por identidad desde endpoints de listado antes de construir la matriz de ataque cruzado.
+- Separa `observed_by` de `owner_identity` en Resource Discovery para no confundir recursos visibles con recursos propios.
+- Endurece BFLA/privilege para que `HTTP 2xx` con semántica de error de autorización no sea `PROVEN`.
+- Separa cuerpo completo interno de `response_body_preview` redactado para evitar truncado en discovery sin filtrar respuestas completas en proofs.
 
 ## 0.2.0
 

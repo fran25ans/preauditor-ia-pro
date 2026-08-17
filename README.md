@@ -372,6 +372,7 @@ ProofSec puede descubrir recursos con un endpoint de listado configurado. Si no 
       "list_endpoint": "/api/customers",
       "items_path": "data",
       "id_field": "id",
+      "owner_fields": ["owner", "advisor.id", "advisorId"],
       "owner_marker_fields": ["owner", "advisor.id", "advisorId"]
     }
   },
@@ -393,6 +394,14 @@ ProofSec puede descubrir recursos con un endpoint de listado configurado. Si no 
 ```
 
 Con `discovery`, ProofSec hace `advisor_a -> GET /api/customers` y `advisor_b -> GET /api/customers`, aprende qué IDs ve cada identidad y construye automáticamente la matriz de ataque cruzado.
+
+ProofSec distingue tres conceptos:
+
+- `observed_by`: la identidad que ha visto el recurso en un listado.
+- `owner_identity`: el owner resuelto desde campos como `owner`, `advisor.id` o `advisorId`.
+- `UNKNOWN`: recursos visibles pero sin ownership confirmado.
+
+Los recursos compartidos o con owner desconocido no se usan para declarar BOLA `PROVEN` hasta resolver ownership. El cuerpo completo se usa solo para análisis interno con límite de tamaño; los entregables guardan únicamente previews redactados.
 
 Ejecuta el test BOLA:
 
@@ -447,6 +456,8 @@ Principios de ProofSec:
 - funcionamiento local/offline siempre que sea posible
 - ningún finding se marca como `PROVEN` sin evidencia dinámica real
 - BOLA/IDOR solo es `PROVEN` si el validador confirma recurso y ownership; `200 + body no vacío` no es suficiente
+- discovery separa `observed_by` de `owner_identity`; visible para una identidad no equivale automáticamente a pertenecerle
+- el cuerpo completo de respuesta se usa para análisis interno, pero los proofs exportan solo previews redactados
 - las pruebas dinámicas requieren `target.authorized: true`
 - por defecto solo se permiten targets `localhost` o `127.0.0.1`
 - solo se ejecutan pruebas de lectura para BOLA/IDOR

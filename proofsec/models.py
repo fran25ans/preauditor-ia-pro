@@ -244,6 +244,9 @@ class ProofSecResourceExample:
     resource: str
     resource_id: str
     owner_identity: str
+    observed_by: tuple[str, ...] = ()
+    ownership_source: str = "manual"
+    ownership_confidence: float = 1.0
     sensitive_markers: tuple[str, ...] = ()
 
 
@@ -267,6 +270,7 @@ class HttpExchangeEvidence:
     status: int | None
     response_headers: dict[str, str]
     response_body_preview: str
+    response_body: str = ""
     error: str = ""
 
 
@@ -295,4 +299,6 @@ class SecurityProof:
     generated_at: str = field(default_factory=utc_now)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload["evidence"].pop("response_body", None)
+        return payload

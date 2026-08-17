@@ -42,6 +42,7 @@
       "list_endpoint": "/api/customers",
       "items_path": "data",
       "id_field": "id",
+      "owner_fields": ["owner", "advisor.id", "advisorId"],
       "owner_marker_fields": ["owner", "advisor.id", "advisorId"]
     }
   }

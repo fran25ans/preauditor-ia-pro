@@ -20,7 +20,7 @@ from proofsec.models import (
     SecurityProof,
     stable_hash,
 )
-from proofsec.proof_validator import validate_bola_response
+from proofsec.proof_validator import validate_authorization_response, validate_bola_response
 from proofsec.regression import generate_spring_mockmvc_test
 from proofsec.remediation import suggest_fix_for_bola
 from proofsec.runtime_config import (
@@ -36,8 +36,7 @@ from proofsec.runtime_config import (
 
 READ_METHODS = {"GET", "HEAD"}
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-SUCCESS_STATUSES = set(range(200, 300))
-FORBIDDEN_STATUSES = {401, 403, 404}
+MAX_ANALYSIS_BODY_BYTES = 1024 * 1024
 
 
 def endpoint_url(target: ProofSecTarget, endpoint: EndpointNode, resource_id: str) -> str:
@@ -62,11 +61,12 @@ def run_http_request(
             status=None,
             response_headers={},
             response_body_preview="DRY RUN: request was not executed.",
+            response_body="",
         )
     request = urlrequest.Request(url, headers=safe_headers, method=method)
     try:
         with urlrequest.urlopen(request, timeout=target.timeout_seconds) as response:
-            body = response.read(4096).decode("utf-8", errors="replace")
+            body = response.read(MAX_ANALYSIS_BODY_BYTES).decode("utf-8", errors="replace")
             return HttpExchangeEvidence(
                 method=method,
                 url=url,
@@ -74,10 +74,11 @@ def run_http_request(
                 status=int(response.status),
                 response_headers=redacted_headers(dict(response.headers.items())),
                 response_body_preview=redact_body(body),
+                response_body=body,
             )
     except urlerror.HTTPError as exc:
         try:
-            body = exc.read(4096).decode("utf-8", errors="replace")
+            body = exc.read(MAX_ANALYSIS_BODY_BYTES).decode("utf-8", errors="replace")
             return HttpExchangeEvidence(
                 method=method,
                 url=url,
@@ -85,6 +86,7 @@ def run_http_request(
                 status=int(exc.code),
                 response_headers=redacted_headers(dict(exc.headers.items())),
                 response_body_preview=redact_body(body),
+                response_body=body,
             )
         finally:
             exc.close()
@@ -96,6 +98,7 @@ def run_http_request(
             status=None,
             response_headers={},
             response_body_preview="",
+            response_body="",
             error=str(exc),
         )
 
@@ -184,23 +187,16 @@ def build_authorization_proof(
     evidence: HttpExchangeEvidence,
     classification: str,
 ) -> SecurityProof:
-    proven = evidence.status in SUCCESS_STATUSES
-    fixed = evidence.status in FORBIDDEN_STATUSES
-    if proven:
-        state = "PROVEN"
-        exploitability = "PROVEN"
+    validation = validate_authorization_response(evidence)
+    state = validation.state
+    exploitability = validation.exploitability
+    confidence = validation.confidence
+    if state == "PROVEN":
         conclusion = "SECURITY INVARIANT VIOLATED. Lower-privileged identity accessed a restricted function."
-        confidence = 1.0
-    elif fixed:
-        state = "FIXED"
-        exploitability = "FIXED"
+    elif state == "FIXED":
         conclusion = "Authorization check respected during this run. Restricted function was denied."
-        confidence = 0.95
     else:
-        state = "LIKELY"
-        exploitability = "UNKNOWN"
         conclusion = "Dynamic authorization test was inconclusive and needs manual review."
-        confidence = 0.55
     vulnerability = (
         "Broken Function Level Authorization"
         if classification == "BFLA"
@@ -227,7 +223,7 @@ def build_authorization_proof(
         resource_owner="restricted_role:" + ",".join(endpoint.roles),
         endpoint=f"{endpoint.method} {endpoint.path}",
         classification=classification,
-        conclusion=conclusion,
+        conclusion=f"{conclusion} Evidence quality: {validation.reason}",
         evidence=evidence,
         affected_code=f"{endpoint.file}:{endpoint.line}",
         suggested_fix=suggest_fix_for_authorization(endpoint, identity, classification),
@@ -261,6 +257,10 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
             for identity in identities.values():
                 for resource in resources:
                     if resource.resource != invariant.resource or resource.owner_identity == identity.name:
+                        continue
+                    if resource.owner_identity == "UNKNOWN" or resource.ownership_confidence <= 0:
+                        continue
+                    if identity.name in resource.observed_by:
                         continue
                     if identity.role not in endpoint.roles:
                         continue
