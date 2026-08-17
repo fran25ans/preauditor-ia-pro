@@ -24,7 +24,7 @@ from proofsec.invariants import (
 )
 from proofsec.llm.invariant_suggestions import suggest_invariants_with_llm
 from proofsec.llm.ollama import parse_json_object
-from proofsec.attack_engine import retest_proof, run_bola_tests
+from proofsec.attack_engine import run_authorization_tests, retest_proof, run_bola_tests
 
 
 class PreauditorRuleTests(unittest.TestCase):
@@ -983,6 +983,32 @@ public class CustomerController {
         )
         return model_path, contract_path, config_path, invariant_id
 
+    def add_admin_controller(self, root: Path) -> None:
+        controller = root / "src/main/java/com/example/AdminController.java"
+        controller.write_text(
+            """
+package com.example;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')")
+public class AdminController {
+    @GetMapping("/audit")
+    public String auditLog() {
+        return "audit";
+    }
+
+    @PostMapping("/reindex")
+    public void reindex() {
+    }
+}
+""",
+            encoding="utf-8",
+        )
+
     def run_customer_server(self, secure: bool):
         class CustomerHandler(BaseHTTPRequestHandler):
             def log_message(self, format, *args):
@@ -999,6 +1025,12 @@ public class CustomerController {
                     self.end_headers()
                     self.wfile.write(b'{"error":"forbidden"}')
                     return
+                if self.path == "/api/admin/audit":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"entries":["admin-audit-visible"]}')
+                    return
                 if self.path in {"/api/customers/101", "/api/customers/202"}:
                     customer_id = self.path.rsplit("/", 1)[-1]
                     owner = "advisor_b" if customer_id == "202" else "advisor_a"
@@ -1009,6 +1041,11 @@ public class CustomerController {
                     return
                 self.send_response(404)
                 self.end_headers()
+
+            def do_POST(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"ok":true}')
 
         server = ThreadingHTTPServer(("127.0.0.1", 0), CustomerHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -1079,6 +1116,105 @@ public class CustomerController {
         self.assertEqual(retest_payload["kpis"]["fixed_vulnerabilities"], 2)
         self.assertEqual(retest_payload["proofs"][0]["finding_state"], "FIXED")
         self.assertIn("FIX VERIFIED", retest_payload["proofs"][0]["conclusion"])
+
+    def test_proofsec_bfla_engine_proves_lower_role_can_access_admin_function(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                self.add_admin_controller(root)
+                model = build_security_model(root)
+                model_path = root / "model.json"
+                config_path = root / "runtime.json"
+                model.write_json(model_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {
+                                "base_url": f"http://127.0.0.1:{server.server_port}",
+                                "authorized": True,
+                                "max_requests": 5,
+                            },
+                            "identities": {
+                                "advisor_a": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                                }
+                            },
+                            "resources": {
+                                "customer_101": {
+                                    "resource": "customers",
+                                    "id": "101",
+                                    "owner_identity": "advisor_a",
+                                }
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_authorization_tests(model_path, config_path, "bfla")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["bfla"], 1)
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 1)
+        proof = payload["proofs"][0]
+        self.assertEqual(proof["classification"], "BFLA")
+        self.assertEqual(proof["vulnerability"], "Broken Function Level Authorization")
+        self.assertEqual(proof["actual"], "200")
+        self.assertIn("Lower-privileged identity", proof["conclusion"])
+
+    def test_proofsec_privilege_engine_skips_mutating_endpoints_by_default(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                self.add_admin_controller(root)
+                model = build_security_model(root)
+                model_path = root / "model.json"
+                config_path = root / "runtime.json"
+                model.write_json(model_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {
+                                "base_url": f"http://127.0.0.1:{server.server_port}",
+                                "authorized": True,
+                                "max_requests": 5,
+                                "allow_mutating": False,
+                            },
+                            "identities": {
+                                "advisor_a": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                                }
+                            },
+                            "resources": {
+                                "customer_101": {
+                                    "resource": "customers",
+                                    "id": "101",
+                                    "owner_identity": "advisor_a",
+                                }
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                skipped = run_authorization_tests(model_path, config_path, "privilege")
+                config = preauditor.json.loads(config_path.read_text(encoding="utf-8"))
+                config["target"]["allow_mutating"] = True
+                config_path.write_text(preauditor.json.dumps(config), encoding="utf-8")
+                executed = run_authorization_tests(model_path, config_path, "privilege")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(skipped["kpis"]["tests_executed"], 0)
+        self.assertGreaterEqual(executed["kpis"]["privilege_escalation"], 1)
+        self.assertEqual(executed["proofs"][0]["classification"], "PRIVILEGE_ESCALATION")
 
 
 if __name__ == "__main__":

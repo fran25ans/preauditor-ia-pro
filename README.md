@@ -331,7 +331,8 @@ Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autori
     "base_url": "http://127.0.0.1:8080",
     "authorized": true,
     "max_requests": 10,
-    "timeout_seconds": 5
+    "timeout_seconds": 5,
+    "allow_mutating": false
   },
   "identities": {
     "advisor_a": {
@@ -375,6 +376,16 @@ proofsec test \
   --out deliverables/proofsec/security-proofs.json
 ```
 
+También puedes ejecutar:
+
+```bash
+proofsec test --type bfla --model deliverables/proofsec/security-model.json --contract deliverables/proofsec/security-contract-reviewed.json --config proofsec-runtime.json
+proofsec test --type privilege --model deliverables/proofsec/security-model.json --contract deliverables/proofsec/security-contract-reviewed.json --config proofsec-runtime.json
+proofsec test --type all --model deliverables/proofsec/security-model.json --contract deliverables/proofsec/security-contract-reviewed.json --config proofsec-runtime.json
+```
+
+`bfla` prueba accesos de un rol bajo a funciones de otro rol usando endpoints de lectura. `privilege` cubre acciones mutantes como `POST`, `PUT`, `PATCH` o `DELETE`, pero queda bloqueado por defecto salvo que el runtime incluya `"allow_mutating": true`.
+
 Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`:
 
 ```text
@@ -407,6 +418,8 @@ Principios de ProofSec:
 - las pruebas dinámicas requieren `target.authorized: true`
 - por defecto solo se permiten targets `localhost` o `127.0.0.1`
 - solo se ejecutan pruebas de lectura para BOLA/IDOR
+- BFLA ejecuta solo endpoints de lectura salvo configuración explícita
+- privilege escalation no ejecuta acciones mutantes salvo `"allow_mutating": true`
 - tokens, cookies y secretos se redactan siempre en evidencias e informes
 
 ## Qué detecta

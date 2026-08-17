@@ -7,7 +7,7 @@
 - Detecta permisos, componentes exportados, configuraciones móviles inseguras, dominios, endpoints, secretos y cambios entre builds.
 - Genera decisión preliminar de release: `APPROVED`, `NEEDS_REVIEW` o `BLOCKED`.
 - Añade checklist de preparación para tienda, política de release configurable y timeline histórico por aplicación.
-- Amplía ProofSec con configuración de target autorizado, identidades de prueba, motor BOLA/IDOR seguro, Security Proof, propuesta de remediación, test de regresión conceptual y retest de fixes.
+- Amplía ProofSec con configuración de target autorizado, identidades de prueba, motor BOLA/IDOR seguro, BFLA, privilege escalation controlado, Security Proof, propuesta de remediación, test de regresión conceptual y retest de fixes.
 - Añade guardrails dinámicos: `target.authorized: true`, localhost por defecto, límite de requests, timeout y evidencias con tokens redactados.
 
 ## 0.2.0

@@ -34,6 +34,7 @@ def load_target(config: dict) -> ProofSecTarget:
         max_requests=max(int(target.get("max_requests", 20)), 0),
         timeout_seconds=max(float(target.get("timeout_seconds", 5)), 0.1),
         rate_limit_seconds=max(float(target.get("rate_limit_seconds", 0)), 0.0),
+        allow_mutating=bool(target.get("allow_mutating", False)),
     )
 
 

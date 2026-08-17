@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import sys
 
-from proofsec.attack_engine import retest_proof, run_bola_tests, write_proofs
+from proofsec.attack_engine import retest_proof, run_dynamic_tests, write_proofs
 from proofsec.contract import load_security_model, merge_invariants, propose_security_contract, write_contract
 from proofsec.invariants import (
     confirm_all_proposed,
@@ -54,7 +54,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     invariants.add_argument("--confirm-all", action="store_true", help="Confirm all proposed invariants.")
 
     test = subparsers.add_parser("test", help="Run safe dynamic validation against an authorized target.")
-    test.add_argument("--type", choices=["bola"], default="bola", help="Dynamic test family to execute.")
+    test.add_argument(
+        "--type",
+        choices=["bola", "bfla", "privilege", "all"],
+        default="bola",
+        help="Dynamic test family to execute.",
+    )
     test.add_argument("--model", required=True, help="ProofSec security model JSON.")
     test.add_argument("--contract", required=True, help="Security Contract JSON with confirmed invariants.")
     test.add_argument("--config", required=True, help="Authorized runtime config JSON with target, identities and resources.")
@@ -176,10 +181,7 @@ def command_invariants(args: argparse.Namespace) -> int:
 
 def command_test(args: argparse.Namespace) -> int:
     try:
-        if args.type != "bola":
-            print("ProofSec currently supports only --type bola.", file=sys.stderr)
-            return 2
-        payload = run_bola_tests(Path(args.model), Path(args.contract), Path(args.config))
+        payload = run_dynamic_tests(Path(args.model), Path(args.contract), Path(args.config), args.type)
         output = Path(args.out)
         write_proofs(payload, output)
     except Exception as exc:

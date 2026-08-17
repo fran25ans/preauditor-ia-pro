@@ -256,6 +256,7 @@ class ProofSecTarget:
     max_requests: int = 20
     timeout_seconds: float = 5.0
     rate_limit_seconds: float = 0.0
+    allow_mutating: bool = False
 
 
 @dataclass(frozen=True)

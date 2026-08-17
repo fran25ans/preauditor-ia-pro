@@ -37,6 +37,7 @@ proofsec contract ./examples/proofsec-spring-demo --out deliverables/proofsec/se
 proofsec contract ./examples/proofsec-spring-demo --out deliverables/proofsec/security-contract.json
 proofsec invariants --contract deliverables/proofsec/security-contract.json --model deliverables/proofsec/security-model.json --confirm-all --updated-contract deliverables/proofsec/security-contract-reviewed.json --out deliverables/proofsec/invariant-state.json
 proofsec test --type bola --model deliverables/proofsec/security-model.json --contract deliverables/proofsec/security-contract-reviewed.json --config examples/proofsec-runtime.example.json --out deliverables/proofsec/security-proofs.json
+proofsec test --type all --model deliverables/proofsec/security-model.json --contract deliverables/proofsec/security-contract-reviewed.json --config examples/proofsec-runtime.example.json --out deliverables/proofsec/security-proofs-all.json
 preauditor ./sample-vulnerable --profile pro --ollama --fail-on never
 preauditor ./sample-vulnerable --profile pro --rules-file examples/custom-rules.yml --fail-on never
 python3 -m unittest discover -s tests
