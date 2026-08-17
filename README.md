@@ -13,6 +13,7 @@ Pre-Auditor IA Pro instala dos comandos locales:
 - `mobile-release-radar`
 - `mobile-release-ui`
 - `proofsec`
+- `proofsec-ui`
 
 ### Instalación rápida recomendada
 
@@ -270,6 +271,20 @@ La UI móvil es local y escucha solo en `127.0.0.1`.
 ## ProofSec experimental
 
 ProofSec es la evolución orientada a demostrar explotabilidad real en entornos autorizados. El objetivo es pasar de hallazgos potenciales a pruebas reproducibles basadas en invariantes de seguridad.
+
+También tiene una vista local propia:
+
+```bash
+proofsec-ui
+```
+
+Abre:
+
+```text
+http://127.0.0.1:8795
+```
+
+Desde esa pantalla puedes seleccionar el proyecto, generar el modelo, proponer/confirmar invariantes para la ejecución, elegir el runtime autorizado y lanzar pruebas `BOLA`, `BFLA`, `privilege` o `all` sin escribir los comandos a mano.
 
 Construye un modelo de seguridad local de aplicaciones Spring Boot REST:
 

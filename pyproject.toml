@@ -36,7 +36,8 @@ preauditor-ui = "preauditor_ui:main"
 mobile-release-radar = "mobile_release_radar:main"
 mobile-release-ui = "mobile_release_ui:main"
 proofsec = "proofsec.cli:main"
+proofsec-ui = "proofsec_ui:main"
 
 [tool.setuptools]
-py-modules = ["preauditor", "preauditor_ui", "mobile_release_radar", "mobile_release_ui"]
+py-modules = ["preauditor", "preauditor_ui", "mobile_release_radar", "mobile_release_ui", "proofsec_ui"]
 packages = ["proofsec", "proofsec.discovery", "proofsec.llm"]

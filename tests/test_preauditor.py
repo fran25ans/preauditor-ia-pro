@@ -14,6 +14,7 @@ import mobile_release_radar
 import mobile_release_ui
 import preauditor
 import preauditor_ui
+import proofsec_ui
 from proofsec.security_model import build_security_model, write_model_sqlite
 from proofsec.contract import contract_to_yaml, merge_invariants, propose_security_contract
 from proofsec.invariants import (
@@ -1215,6 +1216,46 @@ public class AdminController {
         self.assertEqual(skipped["kpis"]["tests_executed"], 0)
         self.assertGreaterEqual(executed["kpis"]["privilege_escalation"], 1)
         self.assertEqual(executed["proofs"][0]["classification"], "PRIVILEGE_ESCALATION")
+
+    def test_proofsec_ui_renders_dedicated_view(self):
+        html_text = proofsec_ui.render_home().decode("utf-8")
+        self.assertIn("ProofSec", html_text)
+        self.assertIn("Generate ProofSec Analysis", html_text)
+        self.assertIn("BOLA / IDOR", html_text)
+        self.assertIn("Privilege escalation", html_text)
+        self.assertIn("Security Proofs", html_text)
+
+    def test_proofsec_ui_run_generates_model_contract_and_invariants_without_dynamic(self):
+        with tempfile.TemporaryDirectory(dir=proofsec_ui.APP_ROOT) as tmp:
+            root = Path(tmp) / "project"
+            output = Path(tmp) / "out"
+            self.write_spring_demo(root)
+            result = proofsec_ui.proofsec_run(
+                {
+                    "target": str(root),
+                    "output_dir": str(output),
+                    "stack": "spring-boot",
+                    "confirm_all": "1",
+                    "run_dynamic": "0",
+                    "test_type": "bola",
+                    "config": str(Path(tmp) / "missing-runtime.json"),
+                }
+            )
+            model_exists = Path(result["files"]["model"]).exists()
+            contract_exists = Path(result["files"]["contract"]).exists()
+            invariants_exists = Path(result["files"]["invariants"]).exists()
+
+        self.assertEqual(result["kpis"]["endpoints_discovered"], 2)
+        self.assertEqual(result["kpis"]["confirmed_invariants"], 1)
+        self.assertEqual(result["kpis"]["tests_executed"], 0)
+        self.assertTrue(model_exists)
+        self.assertTrue(contract_exists)
+        self.assertTrue(invariants_exists)
+
+    def test_proofsec_ui_rejects_remote_host(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                proofsec_ui.parse_args(["--host", "0.0.0.0"])
 
 
 if __name__ == "__main__":
