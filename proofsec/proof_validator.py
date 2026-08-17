@@ -60,7 +60,7 @@ def contains_error_semantics(value: Any) -> bool:
         return any(contains_error_semantics(item) for item in value)
     if isinstance(value, str):
         lowered = value.lower()
-        return any(token in lowered for token in ("cannot be accessed", "forbidden", "denied", "not allowed", "unauthorized"))
+        return any(token in lowered for token in ("cannot be accessed", "forbidden", "denied", "not allowed", "unauthorized", "blocked"))
     return False
 
 
@@ -154,6 +154,17 @@ def is_positive_resource_path(path: tuple[str, ...]) -> bool:
     return False
 
 
+def object_has_access_decision_semantics(value: dict[str, Any]) -> bool:
+    lowered_keys = {str(key).lower(): item for key, item in value.items()}
+    for key in ("allowed", "accessible", "authorized", "permitted", "canaccess", "can_access"):
+        if key in lowered_keys and lowered_keys[key] is False:
+            return True
+    for key in ("data", "result", "resource"):
+        if key in lowered_keys and lowered_keys[key] is None:
+            return True
+    return False
+
+
 def object_contains_resource_id(value: dict[str, Any], resource_id: str) -> bool:
     candidate_keys = {"id", "customer_id", "customerId", "resource_id", "resourceId", "account_id", "accountId", "document_id", "documentId"}
     for key, item in value.items():
@@ -194,6 +205,8 @@ def find_resource_object(parsed: Any, resource: ProofSecResourceExample) -> dict
         return None
     for path, item in iter_json_objects_with_path(parsed):
         if not is_positive_resource_path(path):
+            continue
+        if not path and object_has_access_decision_semantics(item):
             continue
         if object_contains_resource_id(item, resource.resource_id):
             return item

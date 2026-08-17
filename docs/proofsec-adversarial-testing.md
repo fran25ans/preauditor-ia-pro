@@ -23,6 +23,10 @@ This document records adversarial cases used to reduce false `PROVEN` results in
 | Response shape | No reliable id candidate exists | `id_field: null` / needs confirmation |
 | BOLA validation | `context`, `extra`, `info`, `audit.requested` or `requestedResource` contain target id and owner | Not `PROVEN` |
 | BOLA validation | `data.previous` contains target id and owner but current resource is null | Not `PROVEN` |
+| BOLA validation | Root object contains `id`/`owner` but `allowed=false`, `accessible=false`, `result=null` or `data=null` | Not `PROVEN` |
+| BOLA validation | GraphQL-style `data.customer` contains target id and owner without explicit response shape | Not `PROVEN` |
+| BOLA validation | JSON:API relationship points to owner | `VALIDATED`, not `PROVEN` |
+| BOLA validation | `204`, `206` and redirects | Not `PROVEN` unless structural ownership evidence exists |
 | Ownership | Multiple identity-correlated fields in the same object point to different identities | Penalized as ambiguous |
 | Ownership | `managerId` correlates with `identity.attributes.user_id` | High-confidence suggestion |
 | Ownership | One-off random match | Low confidence |
@@ -34,6 +38,7 @@ This document records adversarial cases used to reduce false `PROVEN` results in
 - Empty paginated responses could select `links` as the collection path. Response shape discovery now penalizes link collections and prefers known resource collection keys such as `content`, `data`, `results` and `items`.
 - BOLA validation now requires positive structural context for the returned resource: root object, direct `data`/`result` wrappers, or items inside resource collection wrappers.
 - Response shape discovery now fails closed with `id_field: null` when the best candidate is too weak.
+- Root objects with access-decision semantics are not treated as returned resources.
 
 ## Principle
 

@@ -28,6 +28,8 @@
 - Endurece BOLA con contexto estructural positivo: `context`, `extra`, `info`, `audit.requested` o `data.previous` no pueden producir `PROVEN`.
 - Cambia discovery para fallar cerrado con `id_field: null` cuando no hay identificador fiable, en vez de inventar `id`.
 - Penaliza ownership ambiguo cuando varios campos de un mismo objeto correlacionan con identidades diferentes.
+- Añade ronda adversarial para root objects con semántica de access-check, GraphQL-style responses, JSON:API, `204`, `206` y redirects.
+- Endurece BOLA para no tratar como recurso devuelto un root object con `allowed=false`, `accessible=false`, `data=null` o `result=null`.
 
 ## 0.2.0
 

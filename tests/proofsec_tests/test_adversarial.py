@@ -58,6 +58,127 @@ class ProofSecAdversarialTests(unittest.TestCase):
 
                 self.assertNotEqual(result.state, "PROVEN")
 
+    def test_bola_root_access_decision_allowed_false_is_not_proven(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "id": "202",
+                    "owner": "advisor_b",
+                    "allowed": False,
+                    "data": None,
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_root_access_decision_accessible_false_is_not_proven(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "id": "202",
+                    "owner": "advisor_b",
+                    "exists": True,
+                    "accessible": False,
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_root_result_null_is_not_proven(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "id": "202",
+                    "owner": "advisor_b",
+                    "result": None,
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_graphql_style_multiple_resources_is_not_proven_without_explicit_shape(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "data": {
+                        "customer": {"id": "202", "owner": "advisor_b"},
+                        "viewer": {"id": "advisor_a"},
+                    }
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertNotEqual(result.state, "PROVEN")
+
+    def test_bola_json_api_relationships_do_not_confirm_ownership(self):
+        result = validate_bola_response(
+            evidence(
+                200,
+                {
+                    "data": {
+                        "type": "customers",
+                        "id": "202",
+                        "relationships": {
+                            "advisor": {
+                                "data": {
+                                    "type": "advisors",
+                                    "id": "advisor_b",
+                                }
+                            }
+                        },
+                    }
+                },
+            ),
+            customer_202(),
+        )
+
+        self.assertEqual(result.state, "VALIDATED")
+        self.assertFalse(result.owner_confirmed)
+
+    def test_bola_204_no_content_is_fixed_not_proven(self):
+        result = validate_bola_response(
+            HttpExchangeEvidence(
+                method="GET",
+                url="http://127.0.0.1:8080/customers/202",
+                request_headers={},
+                status=204,
+                response_headers={},
+                response_body_preview="",
+                response_body="",
+            ),
+            customer_202(),
+        )
+
+        self.assertEqual(result.state, "INCONCLUSIVE")
+
+    def test_bola_206_partial_content_is_not_proven_without_owner(self):
+        result = validate_bola_response(
+            evidence(206, {"data": {"id": "202", "name": "partial"}}),
+            customer_202(),
+        )
+
+        self.assertEqual(result.state, "VALIDATED")
+        self.assertFalse(result.owner_confirmed)
+
+    def test_bola_redirect_is_not_proven(self):
+        result = validate_bola_response(
+            evidence(302, ""),
+            customer_202(),
+        )
+
+        self.assertEqual(result.state, "INCONCLUSIVE")
+
     def test_bola_requested_audit_object_does_not_become_proven(self):
         result = validate_bola_response(
             evidence(
