@@ -64,7 +64,7 @@ def load_identities(config: dict) -> dict[str, ProofSecIdentity]:
     return identities
 
 
-def load_resource_examples(config: dict) -> list[ProofSecResourceExample]:
+def load_resource_examples(config: dict, require: bool = True) -> list[ProofSecResourceExample]:
     examples: list[ProofSecResourceExample] = []
     for name, raw in (config.get("resources") or {}).items():
         examples.append(
@@ -76,7 +76,7 @@ def load_resource_examples(config: dict) -> list[ProofSecResourceExample]:
                 sensitive_markers=tuple(str(item) for item in raw.get("sensitive_markers", [])),
             )
         )
-    if not examples:
+    if require and not examples:
         raise ValueError("At least one resource example is required.")
     return examples
 

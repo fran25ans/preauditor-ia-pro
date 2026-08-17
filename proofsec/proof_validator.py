@@ -42,6 +42,20 @@ def walk_json_values(value: Any) -> list[Any]:
     return [value]
 
 
+def contains_error_semantics(value: Any) -> bool:
+    if isinstance(value, dict):
+        error_keys = {"error", "errors", "message", "detail", "reason"}
+        if any(str(key).lower() in error_keys for key in value):
+            return True
+        return any(contains_error_semantics(item) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_error_semantics(item) for item in value)
+    if isinstance(value, str):
+        lowered = value.lower()
+        return any(token in lowered for token in ("cannot be accessed", "forbidden", "denied", "not allowed", "unauthorized"))
+    return False
+
+
 def parse_json_body(body: str) -> Any | None:
     try:
         return json.loads(body)
@@ -49,18 +63,79 @@ def parse_json_body(body: str) -> Any | None:
         return None
 
 
-def response_contains_resource_id(body: str, resource_id: str) -> bool:
+def iter_json_objects(value: Any) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        objects.append(value)
+        for item in value.values():
+            objects.extend(iter_json_objects(item))
+    elif isinstance(value, list):
+        for item in value:
+            objects.extend(iter_json_objects(item))
+    return objects
+
+
+def object_contains_resource_id(value: dict[str, Any], resource_id: str) -> bool:
+    candidate_keys = {"id", "customer_id", "customerId", "resource_id", "resourceId", "account_id", "accountId", "document_id", "documentId"}
+    for key, item in value.items():
+        if str(key) in candidate_keys and normalize(item) == normalize(resource_id):
+            return True
+    return False
+
+
+def object_contains_owner_marker(value: dict[str, Any], resource: ProofSecResourceExample) -> bool:
+    markers = {normalize(marker) for marker in (resource.owner_identity, *resource.sensitive_markers) if marker}
+    if not markers:
+        return False
+    owner_keys = {
+        "owner",
+        "owner_id",
+        "ownerId",
+        "advisor",
+        "advisor_id",
+        "advisorId",
+        "user",
+        "user_id",
+        "userId",
+        "customer_owner",
+        "customerOwner",
+    }
+    for key, item in value.items():
+        if str(key) in owner_keys:
+            if isinstance(item, dict):
+                if any(normalize(nested) in markers for nested in walk_json_values(item)):
+                    return True
+            elif normalize(item) in markers:
+                return True
+    return False
+
+
+def find_resource_object(parsed: Any, resource: ProofSecResourceExample) -> dict[str, Any] | None:
+    if contains_error_semantics(parsed):
+        return None
+    for item in iter_json_objects(parsed):
+        if object_contains_resource_id(item, resource.resource_id):
+            return item
+    return None
+
+
+def response_contains_resource_id_structurally(body: str, resource_id: str) -> bool:
     if not resource_id:
         return False
     parsed = parse_json_body(body)
     if parsed is not None:
-        return any(normalize(value) == normalize(resource_id) for value in walk_json_values(parsed))
+        if contains_error_semantics(parsed):
+            return False
+        return any(object_contains_resource_id(item, resource_id) for item in iter_json_objects(parsed))
     return f'"{resource_id}"' in body or f":{resource_id}" in body or f": {resource_id}" in body
 
 
-def response_contains_owner_marker(body: str, resource: ProofSecResourceExample) -> bool:
-    markers = [resource.owner_identity, *resource.sensitive_markers]
-    return any(marker and marker in body for marker in markers)
+def response_contains_owner_marker_structurally(body: str, resource: ProofSecResourceExample) -> bool:
+    parsed = parse_json_body(body)
+    if parsed is None:
+        return False
+    resource_object = find_resource_object(parsed, resource)
+    return bool(resource_object and object_contains_owner_marker(resource_object, resource))
 
 
 def validate_bola_response(evidence: HttpExchangeEvidence, resource: ProofSecResourceExample) -> BolaValidation:
@@ -95,8 +170,14 @@ def validate_bola_response(evidence: HttpExchangeEvidence, resource: ProofSecRes
             resource_id_confirmed=False,
             owner_confirmed=False,
         )
-    resource_id_confirmed = response_contains_resource_id(body, resource.resource_id)
-    owner_confirmed = response_contains_owner_marker(body, resource)
+    parsed = parse_json_body(body)
+    if parsed is not None:
+        resource_object = find_resource_object(parsed, resource)
+        resource_id_confirmed = resource_object is not None
+        owner_confirmed = bool(resource_object and object_contains_owner_marker(resource_object, resource))
+    else:
+        resource_id_confirmed = response_contains_resource_id_structurally(body, resource.resource_id)
+        owner_confirmed = False
     if resource_id_confirmed and owner_confirmed:
         return BolaValidation(
             state="PROVEN",

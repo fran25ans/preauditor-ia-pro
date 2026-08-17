@@ -338,7 +338,9 @@ El motor de invariantes permite pasar de `proposed` a `confirmed` o `rejected`. 
 
 ### Pruebas dinámicas BOLA/IDOR
 
-Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autorizado, identidades de prueba y recursos de ejemplo. Los tokens pueden venir de variables de entorno y nunca se escriben completos en las evidencias:
+Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autorizado e identidades de prueba. Los tokens pueden venir de variables de entorno y nunca se escriben completos en las evidencias.
+
+ProofSec puede descubrir recursos con un endpoint de listado configurado. Si no tienes todavía discovery, puedes mantener `resources` como fallback manual:
 
 ```json
 {
@@ -365,20 +367,32 @@ Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autori
       }
     }
   },
+  "discovery": {
+    "customers": {
+      "list_endpoint": "/api/customers",
+      "items_path": "data",
+      "id_field": "id",
+      "owner_marker_fields": ["owner", "advisor.id", "advisorId"]
+    }
+  },
   "resources": {
     "customer_101": {
       "resource": "customers",
       "id": "101",
-      "owner_identity": "advisor_a"
+      "owner_identity": "advisor_a",
+      "sensitive_markers": ["advisor_a"]
     },
     "customer_202": {
       "resource": "customers",
       "id": "202",
-      "owner_identity": "advisor_b"
+      "owner_identity": "advisor_b",
+      "sensitive_markers": ["advisor_b"]
     }
   }
 }
 ```
+
+Con `discovery`, ProofSec hace `advisor_a -> GET /api/customers` y `advisor_b -> GET /api/customers`, aprende qué IDs ve cada identidad y construye automáticamente la matriz de ataque cruzado.
 
 Ejecuta el test BOLA:
 
@@ -401,7 +415,7 @@ proofsec test --type all --model deliverables/proofsec/security-model.json --con
 
 `bfla` prueba accesos de un rol bajo a funciones de otro rol usando endpoints de lectura. `privilege` cubre acciones mutantes como `POST`, `PUT`, `PATCH` o `DELETE`, pero queda bloqueado por defecto salvo que el runtime incluya `"allow_mutating": true`.
 
-Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`. Para BOLA/IDOR, `PROVEN` es estricto: no basta con `HTTP 200`; la respuesta debe confirmar el ID del recurso solicitado y una señal de ownership del recurso ajeno.
+Si la aplicación permite acceso cruzado entre owners, ProofSec genera un `Security Proof`. Para BOLA/IDOR, `PROVEN` es estricto: no basta con `HTTP 200`; la respuesta debe confirmar estructuralmente el ID del recurso solicitado y una señal de ownership dentro del mismo objeto de recurso. Un payload de error con texto como `customer 202 belongs to advisor_b` no cuenta como prueba.
 
 ```text
 SECURITY INVARIANT VIOLATED

@@ -239,7 +239,20 @@ def run_bola_tests(model_path: Path, contract_path: Path, config_path: Path) -> 
     target = load_target(config)
     assert_target_authorized(target)
     identities = load_identities(config)
-    resources = load_resource_examples(config)
+    resources = load_resource_examples(config, require=False)
+    if config.get("discovery"):
+        from proofsec.resource_discovery import discover_resources
+
+        resources = sorted(
+            {(
+                resource.resource,
+                resource.resource_id,
+                resource.owner_identity,
+            ): resource for resource in [*resources, *discover_resources(config, target, identities)]}.values(),
+            key=lambda item: (item.resource, item.resource_id, item.owner_identity),
+        )
+    if not resources:
+        raise ValueError("At least one resource example is required, either in resources or via discovery.")
     proofs: list[SecurityProof] = []
     requests_executed = 0
     invariants = matching_confirmed_bola_invariants(contract_path)

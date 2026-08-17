@@ -36,5 +36,13 @@
       "owner_identity": "advisor_b",
       "sensitive_markers": ["advisor_b"]
     }
+  },
+  "discovery": {
+    "customers": {
+      "list_endpoint": "/api/customers",
+      "items_path": "data",
+      "id_field": "id",
+      "owner_marker_fields": ["owner", "advisor.id", "advisorId"]
+    }
   }
 }

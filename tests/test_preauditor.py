@@ -1034,6 +1034,17 @@ public class AdminController {
                     self.end_headers()
                     self.wfile.write(b'{"entries":["admin-audit-visible"]}')
                     return
+                if self.path == "/api/customers":
+                    items = (
+                        [{"id": "202", "owner": "advisor_b", "email": "customer202@example.test"}]
+                        if authorization.endswith("advisor-b")
+                        else [{"id": "101", "owner": "advisor_a", "email": "customer101@example.test"}]
+                    )
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(preauditor.json.dumps({"data": items}).encode())
+                    return
                 if self.path in {"/api/customers/101", "/api/customers/202"}:
                     customer_id = self.path.rsplit("/", 1)[-1]
                     owner = "advisor_b" if customer_id == "202" else "advisor_a"
@@ -1110,6 +1121,90 @@ public class AdminController {
         self.assertEqual(payload["proofs"][0]["finding_state"], "INCONCLUSIVE")
         self.assertEqual(payload["proofs"][0]["exploitability"], "UNKNOWN")
         self.assertIn("requested resource id was not confirmed", payload["proofs"][0]["conclusion"])
+
+    def test_proofsec_bola_error_payload_with_resource_and_owner_is_not_proven(self):
+        class ErrorPayloadHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                return
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"error":"customer 202 belongs to advisor_b and cannot be accessed"}')
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ErrorPayloadHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                base_url = f"http://127.0.0.1:{server.server_port}"
+                model_path, contract_path, config_path, _ = self.write_proofsec_runtime_files(root, base_url)
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 0)
+        self.assertEqual(payload["proofs"][0]["finding_state"], "INCONCLUSIVE")
+        self.assertIn("requested resource id was not confirmed", payload["proofs"][0]["conclusion"])
+
+    def test_proofsec_bola_discovers_resources_before_cross_owner_test(self):
+        server = self.run_customer_server(secure=False)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self.write_spring_demo(root)
+                model = build_security_model(root)
+                contract = propose_security_contract(model)
+                invariant_id = contract.invariants[0].invariant_id
+                contract = update_invariant_status(contract, invariant_id, "confirmed")
+                model_path = root / "model.json"
+                contract_path = root / "contract.json"
+                config_path = root / "runtime-discovery.json"
+                model.write_json(model_path)
+                contract.write_json(contract_path)
+                config_path.write_text(
+                    preauditor.json.dumps(
+                        {
+                            "target": {
+                                "base_url": f"http://127.0.0.1:{server.server_port}",
+                                "authorized": True,
+                                "max_requests": 10,
+                            },
+                            "identities": {
+                                "advisor_a": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-a"},
+                                },
+                                "advisor_b": {
+                                    "role": "ADVISOR",
+                                    "auth": {"type": "bearer", "token": "test-token-advisor-b"},
+                                },
+                            },
+                            "discovery": {
+                                "customers": {
+                                    "list_endpoint": "/api/customers",
+                                    "items_path": "data",
+                                    "id_field": "id",
+                                    "owner_marker_fields": ["owner"],
+                                }
+                            },
+                        },
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+                payload = run_bola_tests(model_path, contract_path, config_path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(payload["kpis"]["proven_vulnerabilities"], 2)
+        tested_resources = {proof["resource"] for proof in payload["proofs"]}
+        self.assertEqual(tested_resources, {"customer_101", "customer_202"})
+        self.assertIn("ownership marker", payload["proofs"][0]["conclusion"])
 
     def test_proofsec_dynamic_engine_requires_explicit_authorization(self):
         with tempfile.TemporaryDirectory() as tmp:

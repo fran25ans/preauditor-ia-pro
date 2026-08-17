@@ -10,6 +10,8 @@
 - Amplía ProofSec con configuración de target autorizado, identidades de prueba, motor BOLA/IDOR seguro, BFLA, privilege escalation controlado, Security Proof, propuesta de remediación, test de regresión conceptual y retest de fixes.
 - Añade guardrails dinámicos: `target.authorized: true`, localhost por defecto, límite de requests, timeout y evidencias con tokens redactados.
 - Endurece el criterio `PROVEN` de BOLA/IDOR con validador de recurso y ownership; `HTTP 200` con body genérico queda como `INCONCLUSIVE`.
+- Añade validación estructural de BOLA/IDOR para evitar `PROVEN` en payloads de error que solo mencionan recurso y owner como texto.
+- Añade Resource Discovery configurado para aprender recursos por identidad desde endpoints de listado antes de construir la matriz de ataque cruzado.
 
 ## 0.2.0
 
