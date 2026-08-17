@@ -373,6 +373,10 @@ Ejemplo de salida sugerida:
 
 Estas sugerencias no se aceptan como verdad absoluta: sirven como borrador revisable. Con runtime, el informe de discovery incluye candidatos explicables para `id_field` y ownership, por ejemplo presencia, unicidad, coincidencia semántica, matches contra identidades y matches ambiguos.
 
+### Batería adversarial
+
+ProofSec incluye tests adversariales para intentar producir falsos `PROVEN` con JSON engañoso, metadata, respuestas paginadas, campos ambiguos y ownership compartido. La guía viva está en [proofsec-adversarial-testing.md](/Users/franciscojosegimenoesteban/Desktop/Auditoria/docs/proofsec-adversarial-testing.md).
+
 ### Pruebas dinámicas BOLA/IDOR
 
 Para ejecutar pruebas dinámicas hace falta un fichero runtime con target autorizado e identidades de prueba. Los tokens pueden venir de variables de entorno y nunca se escriben completos en las evidencias.

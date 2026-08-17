@@ -8,6 +8,7 @@ from typing import Any
 
 COMMON_COLLECTION_KEYS = ("content", "data", "results", "items")
 ID_FIELD_NAMES = ("id", "uuid")
+NON_RESOURCE_COLLECTION_KEYS = ("links", "_links")
 
 
 @dataclass(frozen=True)
@@ -82,9 +83,11 @@ def collection_candidates(value: Any, prefix: str = "", depth: int = 0) -> list[
 
 
 def score_collection(path: str, items: list[Any]) -> float:
+    if path.lower().rsplit(".", 1)[-1] in NON_RESOURCE_COLLECTION_KEYS:
+        return 0.12
     dict_count = sum(1 for item in items if isinstance(item, dict))
     dict_ratio = dict_count / max(len(items), 1)
-    key_bonus = 0.16 if path in COMMON_COLLECTION_KEYS else 0.0
+    key_bonus = 0.24 if path in COMMON_COLLECTION_KEYS else 0.0
     size_bonus = min(0.18, len(items) * 0.03)
     root_bonus = 0.1 if path == "" else 0.0
     return min(0.98, 0.45 + (0.28 * dict_ratio) + key_bonus + size_bonus + root_bonus)
@@ -172,6 +175,8 @@ def infer_id_field(
     )
     if not candidates:
         return "id", ()
+    if candidates[0].confidence < 0.65:
+        return "id", candidates
     return candidates[0].field, candidates
 
 
@@ -179,6 +184,8 @@ def infer_response_shape(resource: str, parsed: Any, has_detail_endpoint: bool =
     items_path, items, collection_confidence, collection_reason = infer_items_collection(parsed)
     id_field, candidates = infer_id_field(resource, items, has_detail_endpoint)
     id_confidence = candidates[0].confidence if candidates else 0.35
+    if candidates and id_field != candidates[0].field:
+        id_confidence = 0.35
     confidence = round(min(0.98, (collection_confidence * 0.45) + (id_confidence * 0.55)), 2)
     return ResponseShapeSuggestion(
         items_path=items_path,
@@ -187,4 +194,3 @@ def infer_response_shape(resource: str, parsed: Any, has_detail_endpoint: bool =
         reason=f"{collection_reason} ID field candidate: {id_field}.",
         id_candidates=candidates[:5],
     )
-

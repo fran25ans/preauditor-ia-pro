@@ -109,6 +109,36 @@ def iter_json_objects(value: Any) -> list[dict[str, Any]]:
     return objects
 
 
+NON_RESOURCE_PATH_PARTS = {
+    "meta",
+    "metadata",
+    "page",
+    "pagination",
+    "paging",
+    "links",
+    "_links",
+    "headers",
+    "debug",
+    "trace",
+}
+
+
+def iter_json_objects_with_path(value: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], dict[str, Any]]]:
+    objects: list[tuple[tuple[str, ...], dict[str, Any]]] = []
+    if isinstance(value, dict):
+        objects.append((path, value))
+        for key, item in value.items():
+            objects.extend(iter_json_objects_with_path(item, (*path, str(key))))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            objects.extend(iter_json_objects_with_path(item, (*path, str(index))))
+    return objects
+
+
+def is_non_resource_path(path: tuple[str, ...]) -> bool:
+    return any(part.lower() in NON_RESOURCE_PATH_PARTS for part in path)
+
+
 def object_contains_resource_id(value: dict[str, Any], resource_id: str) -> bool:
     candidate_keys = {"id", "customer_id", "customerId", "resource_id", "resourceId", "account_id", "accountId", "document_id", "documentId"}
     for key, item in value.items():
@@ -147,7 +177,9 @@ def object_contains_owner_marker(value: dict[str, Any], resource: ProofSecResour
 def find_resource_object(parsed: Any, resource: ProofSecResourceExample) -> dict[str, Any] | None:
     if contains_error_semantics(parsed):
         return None
-    for item in iter_json_objects(parsed):
+    for path, item in iter_json_objects_with_path(parsed):
+        if is_non_resource_path(path):
+            continue
         if object_contains_resource_id(item, resource.resource_id):
             return item
     return None

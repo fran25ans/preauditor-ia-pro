@@ -23,6 +23,8 @@
 - Añade tests específicos en `tests/proofsec_tests/` para discovery plan y correlación de ownership.
 - Añade Auto Response Shape Discovery con `proofsec discovery --config`: detecta `items_path`, puntúa `id_field` y correlaciona ownership desde respuestas reales.
 - Expone métricas explicables de ownership: observaciones, matches, ambiguos, semántica y confianza.
+- Añade batería adversarial para ProofSec y corrige falsos `PROVEN` por metadata con `id/owner`.
+- Endurece Response Shape Discovery para no confundir colecciones de `links` con recursos en respuestas paginadas.
 
 ## 0.2.0
 
